@@ -1,83 +1,91 @@
-// ======================================================
+// ============================================================
 // ЧТО Я ПОДПИСЫВАЮ?
 // APP.JS
-// Версия анализатора: 2026-09-30-v3
-// ======================================================
+// VERSION: 2026-09-30-v4
+// ============================================================
+
+(() => {
+
+    "use strict";
 
 
-// ======================================================
-// НАСТРОЙКИ
-// ======================================================
+    // ============================================================
+    // НАСТРОЙКИ
+    // ============================================================
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024;
+    const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
-const PDF_JS_VERSION = "3.11.174";
-const TESSERACT_VERSION = "5.1.0";
+    const PDFJS_URL =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
 
-const PDF_JS_URL =
-    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDF_JS_VERSION}/pdf.min.js`;
+    const PDFJS_WORKER_URL =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-const PDF_WORKER_URL =
-    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDF_JS_VERSION}/pdf.worker.min.js`;
-
-const TESSERACT_URL =
-    `https://cdn.jsdelivr.net/npm/tesseract.js@${TESSERACT_VERSION}/dist/tesseract.min.js`;
+    const TESSERACT_URL =
+        "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js";
 
 
-// ======================================================
-// DOM
-// ======================================================
+    // ============================================================
+    // DOM
+    // ============================================================
 
-const uploadCard = document.getElementById("uploadCard");
-const uploadButton = document.getElementById("uploadButton");
-const fileInput = document.getElementById("fileInput");
+    const uploadCard = document.getElementById("uploadCard");
+    const uploadButton = document.getElementById("uploadButton");
+    const fileInput = document.getElementById("fileInput");
 
-const aboutButton = document.getElementById("aboutButton");
-const aboutModal = document.getElementById("aboutModal");
-const modalOverlay = document.getElementById("modalOverlay");
-const modalClose = document.getElementById("modalClose");
+    const analysisResult =
+        document.getElementById("analysisResult");
 
+    const aboutButton =
+        document.getElementById("aboutButton");
 
-// ======================================================
-// СОСТОЯНИЕ
-// ======================================================
+    const aboutModal =
+        document.getElementById("aboutModal");
 
-let currentFile = null;
-let pdfJsLoaded = false;
-let tesseractLoaded = false;
-let currentWorker = null;
+    const modalOverlay =
+        document.getElementById("modalOverlay");
 
-
-// ======================================================
-// ИНИЦИАЛИЗАЦИЯ
-// ======================================================
-
-document.addEventListener("DOMContentLoaded", () => {
-    initUpload();
-    initModal();
-});
+    const modalClose =
+        document.getElementById("modalClose");
 
 
-// ======================================================
-// ЗАГРУЗКА ФАЙЛА
-// ======================================================
+    // ============================================================
+    // СОСТОЯНИЕ
+    // ============================================================
 
-function initUpload() {
+    let pdfjsPromise = null;
+    let tesseractPromise = null;
 
-    if (uploadButton) {
+    let currentFile = null;
+    let currentAnalysis = null;
+
+
+    // ============================================================
+    // ЗАПУСК
+    // ============================================================
+
+    init();
+
+
+    function init() {
+
+        if (!uploadButton || !fileInput || !uploadCard) {
+            console.error(
+                "Не найдены основные элементы интерфейса."
+            );
+            return;
+        }
+
+
         uploadButton.addEventListener("click", (event) => {
             event.preventDefault();
-
-            if (fileInput) {
-                fileInput.click();
-            }
+            fileInput.click();
         });
-    }
 
-    if (fileInput) {
-        fileInput.addEventListener("change", async (event) => {
 
-            const file = event.target.files && event.target.files[0];
+        fileInput.addEventListener("change", async () => {
+
+            const file = fileInput.files?.[0];
 
             if (!file) {
                 return;
@@ -85,31 +93,33 @@ function initUpload() {
 
             await handleFile(file);
         });
-    }
 
 
-    if (uploadCard) {
+        // --------------------------------------------------------
+        // DRAG & DROP
+        // --------------------------------------------------------
 
         uploadCard.addEventListener("dragover", (event) => {
+
             event.preventDefault();
-            uploadCard.classList.add("drag-active");
+
+            uploadCard.classList.add("dragging");
         });
 
-        uploadCard.addEventListener("dragleave", (event) => {
-            event.preventDefault();
-            uploadCard.classList.remove("drag-active");
+
+        uploadCard.addEventListener("dragleave", () => {
+
+            uploadCard.classList.remove("dragging");
         });
+
 
         uploadCard.addEventListener("drop", async (event) => {
 
             event.preventDefault();
 
-            uploadCard.classList.remove("drag-active");
+            uploadCard.classList.remove("dragging");
 
-            const file =
-                event.dataTransfer &&
-                event.dataTransfer.files &&
-                event.dataTransfer.files[0];
+            const file = event.dataTransfer?.files?.[0];
 
             if (!file) {
                 return;
@@ -117,2858 +127,2370 @@ function initUpload() {
 
             await handleFile(file);
         });
-    }
-}
 
 
-// ======================================================
-// МОДАЛЬНОЕ ОКНО "КАК ЭТО РАБОТАЕТ"
-// ======================================================
+        // --------------------------------------------------------
+        // MODAL "КАК ЭТО РАБОТАЕТ"
+        // --------------------------------------------------------
 
-function initModal() {
+        if (aboutButton && aboutModal) {
 
-    if (aboutButton) {
-        aboutButton.addEventListener("click", () => {
-            openAboutModal();
-        });
-    }
+            aboutButton.addEventListener("click", () => {
 
-    if (modalOverlay) {
-        modalOverlay.addEventListener("click", () => {
-            closeAboutModal();
-        });
-    }
+                aboutModal.classList.add("active");
 
-    if (modalClose) {
-        modalClose.addEventListener("click", () => {
-            closeAboutModal();
-        });
-    }
-
-    document.addEventListener("keydown", (event) => {
-
-        if (event.key === "Escape") {
-            closeAboutModal();
-            closeResultModal();
+                document.body.classList.add("modal-open");
+            });
         }
-    });
-}
 
 
-function openAboutModal() {
+        if (modalClose && aboutModal) {
 
-    if (!aboutModal) {
-        return;
+            modalClose.addEventListener("click", closeAboutModal);
+        }
+
+
+        if (modalOverlay && aboutModal) {
+
+            modalOverlay.addEventListener(
+                "click",
+                closeAboutModal
+            );
+        }
+
+
+        document.addEventListener("keydown", (event) => {
+
+            if (
+                event.key === "Escape" &&
+                aboutModal?.classList.contains("active")
+            ) {
+                closeAboutModal();
+            }
+        });
     }
 
-    aboutModal.classList.add("active");
-    document.body.classList.add("modal-open");
-}
 
+    function closeAboutModal() {
 
-function closeAboutModal() {
+        if (!aboutModal) {
+            return;
+        }
 
-    if (!aboutModal) {
-        return;
-    }
+        aboutModal.classList.remove("active");
 
-    aboutModal.classList.remove("active");
-
-    if (!document.querySelector(".result-modal.active")) {
         document.body.classList.remove("modal-open");
     }
-}
 
 
-// ======================================================
-// ОСНОВНАЯ ОБРАБОТКА
-// ======================================================
+    // ============================================================
+    // ОБРАБОТКА ФАЙЛА
+    // ============================================================
 
-async function handleFile(file) {
+    async function handleFile(file) {
 
-    clearPreviousResult();
+        currentFile = file;
 
-    currentFile = file;
+        clearPreviousResult();
 
-    const validation = validateFile(file);
-
-    if (!validation.valid) {
-        showStatus(validation.message, "error");
-        return;
-    }
-
-    showSelectedFile(file);
-
-    try {
-
-        let extractedText = "";
-
-        const type = getFileType(file);
-
-        if (type === "pdf") {
-
-            showStatus(
-                "Читаем PDF…",
-                "loading"
-            );
-
-            extractedText = await extractPdfText(file);
-
-        } else {
-
-            showStatus(
-                "Распознаём изображение…",
-                "loading"
-            );
-
-            extractedText = await ocrImage(file);
-        }
-
-
-        extractedText = normalizeText(extractedText);
-
-
-        if (!extractedText || extractedText.length < 20) {
-
-            showStatus(
-                "Не удалось получить достаточно текста из документа.",
-                "error"
-            );
-
+        if (!validateFile(file)) {
             return;
         }
 
 
-        const textLength = extractedText.length;
+        showProcessingState(file);
 
-        showStatus(
-            `Текст получен · ${formatNumber(textLength)} символов`,
-            "loading"
-        );
 
+        try {
 
-        await sleep(150);
+            const text = await extractText(file);
 
+            if (!text || text.trim().length < 20) {
 
-        const analysis = analyzeDocument(extractedText);
-
-
-        renderAnalysisResult(
-            analysis,
-            extractedText
-        );
-
-
-        showStatus(
-            "Анализ завершён",
-            "success"
-        );
-
-    } catch (error) {
-
-        console.error("Document analysis error:", error);
-
-        showStatus(
-            "Не удалось обработать документ. Попробуйте другой файл.",
-            "error"
-        );
-    }
-}
-
-
-// ======================================================
-// ПРОВЕРКА ФАЙЛА
-// ======================================================
-
-function validateFile(file) {
-
-    if (!file) {
-        return {
-            valid: false,
-            message: "Файл не выбран."
-        };
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-        return {
-            valid: false,
-            message: "Файл слишком большой. Максимальный размер — 20 МБ."
-        };
-    }
-
-    const type = getFileType(file);
-
-    if (!["pdf", "image"].includes(type)) {
-        return {
-            valid: false,
-            message: "Поддерживаются PDF, JPG и PNG."
-        };
-    }
-
-    return {
-        valid: true
-    };
-}
-
-
-function getFileType(file) {
-
-    const name = String(file.name || "").toLowerCase();
-
-    if (
-        file.type === "application/pdf" ||
-        name.endsWith(".pdf")
-    ) {
-        return "pdf";
-    }
-
-    if (
-        file.type.startsWith("image/") ||
-        /\.(jpg|jpeg|png)$/i.test(name)
-    ) {
-        return "image";
-    }
-
-    return "unknown";
-}
-
-
-// ======================================================
-// PDF.JS
-// ======================================================
-
-async function loadPdfJs() {
-
-    if (pdfJsLoaded && window.pdfjsLib) {
-        return window.pdfjsLib;
-    }
-
-    if (window.pdfjsLib) {
-
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-            PDF_WORKER_URL;
-
-        pdfJsLoaded = true;
-
-        return window.pdfjsLib;
-    }
-
-
-    await loadScript(PDF_JS_URL);
-
-    if (!window.pdfjsLib) {
-        throw new Error("PDF.js не загрузился.");
-    }
-
-
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-        PDF_WORKER_URL;
-
-    pdfJsLoaded = true;
-
-    return window.pdfjsLib;
-}
-
-
-// ======================================================
-// ИЗВЛЕЧЕНИЕ ТЕКСТА ИЗ PDF
-// ======================================================
-
-async function extractPdfText(file) {
-
-    const pdfjsLib = await loadPdfJs();
-
-    const arrayBuffer = await file.arrayBuffer();
-
-    const pdf = await pdfjsLib.getDocument({
-        data: arrayBuffer
-    }).promise;
-
-
-    let fullText = "";
-
-    let pagesWithText = 0;
-
-
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-
-        showStatus(
-            `Читаем PDF · страница ${pageNumber} из ${pdf.numPages}`,
-            "loading"
-        );
-
-
-        const page = await pdf.getPage(pageNumber);
-
-        const textContent = await page.getTextContent();
-
-
-        const pageText = textContent.items
-            .map(item => item.str || "")
-            .join(" ")
-            .trim();
-
-
-        if (pageText.length > 30) {
-            pagesWithText++;
-        }
-
-
-        fullText +=
-            `\n\n[Страница ${pageNumber}]\n` +
-            pageText;
-    }
-
-
-    /*
-     * Если PDF практически не содержит текста,
-     * считаем его сканом и запускаем OCR.
-     */
-
-    if (
-        pagesWithText === 0 ||
-        fullText.replace(/\[Страница \d+\]/g, "").trim().length < 80
-    ) {
-
-        showStatus(
-            `PDF похож на скан · запускаем OCR`,
-            "loading"
-        );
-
-        return await ocrPdf(pdf);
-    }
-
-
-    return fullText;
-}
-
-
-// ======================================================
-// TESSERACT
-// ======================================================
-
-async function loadTesseract() {
-
-    if (tesseractLoaded && window.Tesseract) {
-        return window.Tesseract;
-    }
-
-    if (window.Tesseract) {
-        tesseractLoaded = true;
-        return window.Tesseract;
-    }
-
-    await loadScript(TESSERACT_URL);
-
-    if (!window.Tesseract) {
-        throw new Error("Tesseract.js не загрузился.");
-    }
-
-    tesseractLoaded = true;
-
-    return window.Tesseract;
-}
-
-
-// ======================================================
-// OCR ИЗОБРАЖЕНИЯ
-// ======================================================
-
-async function ocrImage(file) {
-
-    const Tesseract = await loadTesseract();
-
-    showStatus(
-        "Подготавливаем распознавание…",
-        "loading"
-    );
-
-
-    const result = await Tesseract.recognize(
-        file,
-        "rus+eng",
-        {
-            logger: handleOcrProgress
-        }
-    );
-
-
-    return result?.data?.text || "";
-}
-
-
-// ======================================================
-// OCR PDF
-// ======================================================
-
-async function ocrPdf(pdf) {
-
-    const Tesseract = await loadTesseract();
-
-    let fullText = "";
-
-
-    for (
-        let pageNumber = 1;
-        pageNumber <= pdf.numPages;
-        pageNumber++
-    ) {
-
-        showStatus(
-            `Распознаём страницу ${pageNumber} из ${pdf.numPages}`,
-            "loading"
-        );
-
-
-        const page = await pdf.getPage(pageNumber);
-
-
-        /*
-         * Умеренное увеличение качества.
-         * Слишком высокий scale сильно замедляет Tesseract.
-         */
-
-        const viewport = page.getViewport({
-            scale: 1.7
-        });
-
-
-        const canvas = document.createElement("canvas");
-
-        const context = canvas.getContext("2d", {
-            willReadFrequently: true
-        });
-
-
-        canvas.width = Math.ceil(viewport.width);
-        canvas.height = Math.ceil(viewport.height);
-
-
-        await page.render({
-            canvasContext: context,
-            viewport
-        }).promise;
-
-
-        const result = await Tesseract.recognize(
-            canvas,
-            "rus+eng",
-            {
-                logger: handleOcrProgress
-            }
-        );
-
-
-        const pageText =
-            result?.data?.text || "";
-
-
-        fullText +=
-            `\n\n[Страница ${pageNumber}]\n` +
-            pageText;
-
-
-        canvas.width = 1;
-        canvas.height = 1;
-    }
-
-
-    return fullText;
-}
-
-
-// ======================================================
-// OCR PROGRESS
-// ======================================================
-
-function handleOcrProgress(message) {
-
-    if (!message) {
-        return;
-    }
-
-    if (message.status === "recognizing text") {
-
-        const progress = Math.round(
-            (message.progress || 0) * 100
-        );
-
-        showStatus(
-            `Распознаём документ · ${progress}%`,
-            "loading"
-        );
-    }
-}
-
-
-// ======================================================
-// АНАЛИЗ ДОКУМЕНТА
-// ======================================================
-
-function analyzeDocument(text) {
-
-    const cleanText = normalizeText(text);
-
-    const sentences = splitIntoSentences(cleanText);
-
-
-    const categories = {
-        important: [],
-        worth: [],
-        money: [],
-        deadlines: [],
-        data: [],
-        restrictions: []
-    };
-
-
-    // ==================================================
-    // ВАЖНО
-    // ==================================================
-
-    addGroupedCategory(
-        categories.important,
-        "renewal",
-        "Автопродление",
-        "Договор или услуга могут продлеваться автоматически.",
-        "↻",
-        sentences,
-        [
-            /автоматическ\w*\s+(?:продл|пролонг)/i,
-            /продлева(?:ется|ть)\s+автоматически/i,
-            /если\s+не\s+уведом/i,
-            /автоматическ\w*\s+пролонгац/i,
-            /пролонгац/i
-        ]
-    );
-
-
-    addGroupedCategory(
-        categories.important,
-        "penalties",
-        "Штрафы и санкции",
-        "Обнаружены условия о штрафах, пенях или других санкциях.",
-        "!",
-        sentences,
-        [
-            /штраф/i,
-            /штрафн/i,
-            /санкци/i,
-            /неустойк/i,
-            /пен[яи]\b/i,
-            /пени\b/i
-        ]
-    );
-
-
-    addGroupedCategory(
-        categories.important,
-        "price_change",
-        "Изменение стоимости",
-        "Документ содержит условия изменения цены или тарифа.",
-        "₽",
-        sentences,
-        [
-            /стоимост\w*.*измен/i,
-            /цен\w*.*измен/i,
-            /тариф\w*.*измен/i,
-            /измен[яи]ть.*цен/i,
-            /измен[яи]ть.*стоим/i,
-            /вправе.*измен.*стоим/i,
-            /может.*измен.*тариф/i,
-            /увелич.*стоим/i
-        ]
-    );
-
-
-    addGroupedCategory(
-        categories.important,
-        "termination_penalty",
-        "Расторжение",
-        "Обнаружены условия досрочного расторжения или последствия прекращения договора.",
-        "×",
-        sentences,
-        [
-            /досрочн\w*\s+расторж/i,
-            /расторгнуть\s+договор/i,
-            /расторжен\w*\s+договор/i,
-            /прекращен\w*\s+договора/i,
-            /отказаться\s+от\s+договора/i
-        ]
-    );
-
-
-    addGroupedCategory(
-        categories.important,
-        "liability",
-        "Ответственность",
-        "Документ содержит условия об ответственности сторон.",
-        "!",
-        sentences,
-        [
-            /ответственност/i,
-            /возмещени\w*\s+ущерб/i,
-            /возместить\s+убыт/i,
-            /убытк/i
-        ]
-    );
-
-
-    // ==================================================
-    // СТОИТ ЗНАТЬ
-    // ==================================================
-
-    addGroupedCategory(
-        categories.worth,
-        "payment",
-        "Оплата",
-        "Условия внесения оплаты, аванса или платежей.",
-        "₽",
-        sentences,
-        [
-            /оплат[аеуы]/i,
-            /оплачива/i,
-            /платеж/i,
-            /плат[аи]ть/i,
-            /аванс/i,
-            /предоплат/i
-        ]
-    );
-
-
-    addGroupedCategory(
-        categories.worth,
-        "commission",
-        "Комиссии",
-        "Обнаружены комиссии, сборы или дополнительные платежи.",
-        "%",
-        sentences,
-        [
-            /комисси/i,
-            /сбор\w*\s+за/i,
-            /дополнительн\w*\s+плат/i,
-            /сервисн\w*\s+сбор/i
-        ]
-    );
-
-
-    addGroupedCategory(
-        categories.worth,
-        "advertising",
-        "Реклама и рассылки",
-        "Документ может содержать согласие на рекламу или рассылки.",
-        "✉",
-        sentences,
-        [
-            /рекламн\w*\s+(?:сообщ|рассыл)/i,
-            /реклам\w*\s+рассыл/i,
-            /согласие\s+на\s+получение\s+реклам/i,
-            /маркетингов/i,
-            /sms[-\s]?сообщ/i
-        ]
-    );
-
-
-    addGroupedCategory(
-        categories.worth,
-        "notifications",
-        "Уведомления",
-        "Обнаружены условия о способе или сроках уведомления.",
-        "i",
-        sentences,
-        [
-            /уведомить/i,
-            /уведомлен/i,
-            /уведомлени/i,
-            /извещен/i,
-            /сообщить\s+о/i
-        ]
-    );
-
-
-    // ==================================================
-    // ДАННЫЕ
-    // ==================================================
-
-    addGroupedCategory(
-        categories.data,
-        "personal_data",
-        "Персональные данные",
-        "Документ содержит условия обработки или передачи персональных данных.",
-        "◎",
-        sentences,
-        [
-            /персональн\w*\s+данн/i,
-            /обработк\w*\s+персональн/i,
-            /согласие\s+на\s+обработк/i
-        ]
-    );
-
-
-    addGroupedCategory(
-        categories.data,
-        "third_parties",
-        "Передача третьим лицам",
-        "Обнаружены условия передачи данных другим организациям или партнёрам.",
-        "→",
-        sentences,
-        [
-            /третьим\s+лиц/i,
-            /партнер\w*/i,
-            /партнё\w*/i,
-            /передач\w*\s+данн/i,
-            /передавать.*данн/i
-        ]
-    );
-
-
-    // ==================================================
-    // ОГРАНИЧЕНИЯ
-    // ==================================================
-
-    addGroupedCategory(
-        categories.restrictions,
-        "limitations",
-        "Ограничение ответственности",
-        "Компания ограничивает объём своей ответственности или исключает отдельные случаи.",
-        "⛔",
-        sentences,
-        [
-            /ограничива[ея]\s+ответственност/i,
-            /ограничен\w*\s+ответственност/i,
-            /не\s+нес[её]т\s+ответственност/i,
-            /не\s+отвечает\s+за/i,
-            /не\s+обязан\w*\s+возмещ/i
-        ]
-    );
-
-
-    addGroupedCategory(
-        categories.restrictions,
-        "restrictions",
-        "Ограничения",
-        "Обнаружены запреты, ограничения или специальные условия использования.",
-        "⊘",
-        sentences,
-        [
-            /запрещается/i,
-            /запрещен/i,
-            /не\s+допускается/i,
-            /ограничива[ея]\s+использован/i,
-            /ограничен\w*\s+доступ/i
-        ]
-    );
-
-
-    // ==================================================
-    // ДЕНЬГИ
-    // ==================================================
-
-    const moneyFindings = extractMoneyFindings(
-        sentences
-    );
-
-    categories.money = groupMoneyFindings(
-        moneyFindings
-    );
-
-
-    // ==================================================
-    // СРОКИ
-    // ==================================================
-
-    categories.deadlines = extractDeadlineFindings(
-        sentences
-    );
-
-
-    // ==================================================
-    // УДАЛЯЕМ ДУБЛИКАТЫ
-    // ==================================================
-
-    for (const key of Object.keys(categories)) {
-
-        categories[key] = removeDuplicateGroups(
-            categories[key]
-        );
-    }
-
-
-    // ==================================================
-    // СТАТИСТИКА
-    // ==================================================
-
-    let groupCount = 0;
-    let fragmentCount = 0;
-
-
-    for (const key of Object.keys(categories)) {
-
-        groupCount += categories[key].length;
-
-        categories[key].forEach(group => {
-
-            fragmentCount +=
-                Array.isArray(group.sources)
-                    ? group.sources.length
-                    : 0;
-        });
-    }
-
-
-    const summary = createSummary(
-        categories,
-        groupCount,
-        fragmentCount,
-        cleanText
-    );
-
-
-    return {
-        categories,
-        summary,
-        stats: {
-            groupCount,
-            fragmentCount,
-            characters: cleanText.length,
-            words: cleanText
-                .split(/\s+/)
-                .filter(Boolean)
-                .length
-        }
-    };
-}
-
-
-// ======================================================
-// ДОБАВЛЕНИЕ ГРУППЫ
-// ======================================================
-
-function addGroupedCategory(
-    target,
-    key,
-    title,
-    description,
-    icon,
-    sentences,
-    patterns
-) {
-
-    const matches = [];
-
-
-    for (const sentence of sentences) {
-
-        if (!sentence || sentence.length < 8) {
-            continue;
-        }
-
-
-        const matched = patterns.some(
-            pattern => pattern.test(sentence)
-        );
-
-
-        if (!matched) {
-            continue;
-        }
-
-
-        matches.push(sentence);
-    }
-
-
-    const uniqueSources =
-        removeDuplicateStrings(matches);
-
-
-    if (!uniqueSources.length) {
-        return;
-    }
-
-
-    target.push({
-        key,
-        title,
-        description,
-        icon,
-        sources: uniqueSources
-    });
-}
-
-
-// ======================================================
-// ДЕНЬГИ
-// ======================================================
-
-function extractMoneyFindings(sentences) {
-
-    const results = [];
-
-
-    for (const sentence of sentences) {
-
-        const moneyMatches =
-            findMoneyExpressions(sentence);
-
-        const percentMatches =
-            findPercentExpressions(sentence);
-
-
-        if (
-            moneyMatches.length === 0 &&
-            percentMatches.length === 0
-        ) {
-            continue;
-        }
-
-
-        const context =
-            cleanFindingText(sentence);
-
-
-        /*
-         * Если в предложении есть деньги —
-         * создаём конкретные денежные условия.
-         */
-
-        for (const money of moneyMatches) {
-
-            const title =
-                classifyMoneyContext(
-                    sentence
+                throw new Error(
+                    "Не удалось извлечь текст из документа."
                 );
-
-
-            results.push({
-                key: createMoneyKey(title),
-                title,
-                value: money,
-                source: context,
-                kind: "money"
-            });
-        }
-
-
-        /*
-         * Проценты связываем с предложением,
-         * а не показываем как отдельное число.
-         */
-
-        for (const percent of percentMatches) {
-
-            const title =
-                classifyPercentContext(
-                    sentence
-                );
-
-
-            results.push({
-                key: createMoneyKey(title),
-                title,
-                value: percent,
-                source: context,
-                kind: "percent"
-            });
-        }
-    }
-
-
-    return results;
-}
-
-
-// ======================================================
-// ДЕНЕЖНЫЕ ВЫРАЖЕНИЯ
-// ======================================================
-
-function findMoneyExpressions(text) {
-
-    const results = [];
-
-
-    /*
-     * 4 990 рублей
-     * 4990 руб.
-     * 4.990,50 ₽
-     * 5 000 р
-     */
-
-    const patterns = [
-
-        /(?:\d{1,3}(?:[ .]\d{3})+(?:[,.]\d{1,2})?|\d+(?:[,.]\d{1,2})?)\s*(?:₽|руб(?:лей|ля|ль)?\.?|р\.)(?!\w)/gi,
-
-        /(?:₽|руб(?:лей|ля|ль)?\.?|р\.)\s*(?:\d{1,3}(?:[ .]\d{3})+(?:[,.]\d{1,2})?|\d+(?:[,.]\d{1,2})?)/gi
-
-    ];
-
-
-    for (const pattern of patterns) {
-
-        const matches = text.match(pattern) || [];
-
-        results.push(...matches);
-    }
-
-
-    return removeDuplicateStrings(
-        results.map(normalizeMoneyExpression)
-    );
-}
-
-
-// ======================================================
-// ПРОЦЕНТЫ
-// ======================================================
-
-function findPercentExpressions(text) {
-
-    const results = [];
-
-
-    const percentPatterns = [
-
-        /\d+(?:[,.]\d+)?\s*%/gi,
-
-        /\d+(?:[,.]\d+)?\s*процент(?:а|ов)?/gi
-
-    ];
-
-
-    for (const pattern of percentPatterns) {
-
-        const matches =
-            text.match(pattern) || [];
-
-        results.push(...matches);
-    }
-
-
-    return removeDuplicateStrings(
-        results.map(value =>
-            value
-                .replace(/\s+/g, " ")
-                .trim()
-        )
-    );
-}
-
-
-// ======================================================
-// КЛАССИФИКАЦИЯ ДЕНЕГ
-// ======================================================
-
-function classifyMoneyContext(sentence) {
-
-    const text =
-        sentence.toLowerCase();
-
-
-    if (
-        /штраф|неустойк|пен[яи]\b|санкци/.test(text)
-    ) {
-        return "Штраф или санкция";
-    }
-
-
-    if (
-        /комисси|сбор/.test(text)
-    ) {
-        return "Комиссия";
-    }
-
-
-    if (
-        /аванс|предоплат/.test(text)
-    ) {
-        return "Аванс или предоплата";
-    }
-
-
-    if (
-        /оплат|платеж|плат[аи]ть/.test(text)
-    ) {
-        return "Оплата";
-    }
-
-
-    if (
-        /стоимост|цен[аеы]|тариф/.test(text)
-    ) {
-        return "Стоимость";
-    }
-
-
-    if (
-        /возмещ|убыт|ущерб/.test(text)
-    ) {
-        return "Возмещение";
-    }
-
-
-    return "Денежное условие";
-}
-
-
-function classifyPercentContext(sentence) {
-
-    const text =
-        sentence.toLowerCase();
-
-
-    if (
-        /штраф|неустойк|пен[яи]\b|санкци/.test(text)
-    ) {
-        return "Штраф или санкция";
-    }
-
-
-    if (
-        /комисси|сбор/.test(text)
-    ) {
-        return "Комиссия";
-    }
-
-
-    if (
-        /стоимост|цен[аеы]|тариф/.test(text)
-    ) {
-        return "Изменение стоимости";
-    }
-
-
-    if (
-        /оплат|платеж|задолженност|долг/.test(text)
-    ) {
-        return "Условие оплаты";
-    }
-
-
-    return "Процентное условие";
-}
-
-
-function createMoneyKey(title) {
-
-    return title
-        .toLowerCase()
-        .replace(/[^а-яёa-z0-9]+/gi, "-")
-        .replace(/^-+|-+$/g, "");
-}
-
-
-// ======================================================
-// ГРУППИРОВКА ДЕНЕГ
-// ======================================================
-
-function groupMoneyFindings(findings) {
-
-    const map = new Map();
-
-
-    for (const item of findings) {
-
-        const key = item.key;
-
-
-        if (!map.has(key)) {
-
-            map.set(key, {
-                key,
-                title: item.title,
-                description: moneyGroupDescription(
-                    item.title
-                ),
-                icon: moneyGroupIcon(
-                    item.title
-                ),
-                sources: [],
-                values: []
-            });
-        }
-
-
-        const group = map.get(key);
-
-
-        if (!group.values.includes(item.value)) {
-            group.values.push(item.value);
-        }
-
-
-        if (!group.sources.includes(item.source)) {
-            group.sources.push(item.source);
-        }
-    }
-
-
-    return Array.from(map.values());
-}
-
-
-function moneyGroupDescription(title) {
-
-    switch (title) {
-
-        case "Стоимость":
-            return "Цена или стоимость услуги.";
-
-        case "Оплата":
-            return "Условия внесения платежей.";
-
-        case "Комиссия":
-            return "Комиссии и дополнительные сборы.";
-
-        case "Штраф или санкция":
-            return "Штрафы, пени и другие денежные последствия.";
-
-        case "Аванс или предоплата":
-            return "Условия предварительной оплаты.";
-
-        case "Изменение стоимости":
-            return "Процентные условия, связанные с ценой.";
-
-        case "Условие оплаты":
-            return "Процент, связанный с оплатой или задолженностью.";
-
-        case "Возмещение":
-            return "Денежное возмещение или компенсация.";
-
-        default:
-            return "Денежное условие документа.";
-    }
-}
-
-
-function moneyGroupIcon(title) {
-
-    if (
-        /штраф|санкци/i.test(title)
-    ) {
-        return "!";
-    }
-
-    if (
-        /комисси/i.test(title)
-    ) {
-        return "%";
-    }
-
-    return "₽";
-}
-
-
-// ======================================================
-// СРОКИ И ДАТЫ
-// ======================================================
-
-function extractDeadlineFindings(sentences) {
-
-    const groups = new Map();
-
-
-    for (const sentence of sentences) {
-
-        const durations =
-            findDurationExpressions(sentence);
-
-        const dates =
-            findDateExpressions(sentence);
-
-
-        if (
-            durations.length === 0 &&
-            dates.length === 0
-        ) {
-            continue;
-        }
-
-
-        const title =
-            classifyDeadlineContext(sentence);
-
-
-        const key =
-            createDeadlineKey(title);
-
-
-        if (!groups.has(key)) {
-
-            groups.set(key, {
-                key,
-                title,
-                description:
-                    deadlineDescription(title),
-                icon: "◷",
-                sources: [],
-                values: []
-            });
-        }
-
-
-        const group = groups.get(key);
-
-
-        for (const value of durations) {
-
-            if (!group.values.includes(value)) {
-                group.values.push(value);
             }
-        }
 
 
-        for (const value of dates) {
+            const normalizedText =
+                normalizeText(text);
 
-            if (!group.values.includes(value)) {
-                group.values.push(value);
-            }
-        }
 
+            currentAnalysis =
+                analyzeDocument(normalizedText);
 
-        if (!group.sources.includes(sentence)) {
-            group.sources.push(sentence);
-        }
-    }
 
-
-    return Array.from(groups.values());
-}
-
-
-// ======================================================
-// ДЛИТЕЛЬНОСТИ
-// ======================================================
-
-function findDurationExpressions(text) {
-
-    const results = [];
-
-
-    const patterns = [
-
-        /\b\d+(?:[,.]\d+)?\s*(?:день|дня|дней)\b/gi,
-
-        /\b\d+(?:[,.]\d+)?\s*(?:сутки|суток)\b/gi,
-
-        /\b\d+(?:[,.]\d+)?\s*(?:недел[яьи])\b/gi,
-
-        /\b\d+(?:[,.]\d+)?\s*(?:месяц(?:а|ев)?)\b/gi,
-
-        /\b\d+(?:[,.]\d+)?\s*(?:год(?:а|ов)?)\b/gi,
-
-        /\b\d+(?:[,.]\d+)?\s*(?:час(?:а|ов)?)\b/gi,
-
-        /\b\d+(?:[,.]\d+)?\s*(?:минут(?:а|ы)?)\b/gi
-
-    ];
-
-
-    for (const pattern of patterns) {
-
-        const matches =
-            text.match(pattern) || [];
-
-        results.push(...matches);
-    }
-
-
-    return removeDuplicateStrings(
-        results.map(value =>
-            value
-                .replace(/\s+/g, " ")
-                .trim()
-        )
-    );
-}
-
-
-// ======================================================
-// ДАТЫ
-// ======================================================
-
-function findDateExpressions(text) {
-
-    const results = [];
-
-
-    const patterns = [
-
-        /\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/g,
-
-        /\b\d{1,2}\s+(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)\s+\d{4}\s*(?:г\.?)?/gi,
-
-        /\b(?:с|до|по|не позднее|не ранее)\s+\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/gi
-
-    ];
-
-
-    for (const pattern of patterns) {
-
-        const matches =
-            text.match(pattern) || [];
-
-        results.push(...matches);
-    }
-
-
-    return removeDuplicateStrings(
-        results.map(value =>
-            value
-                .replace(/\s+/g, " ")
-                .trim()
-        )
-    );
-}
-
-
-// ======================================================
-// КЛАССИФИКАЦИЯ СРОКОВ
-// ======================================================
-
-function classifyDeadlineContext(sentence) {
-
-    const text =
-        sentence.toLowerCase();
-
-
-    if (
-        /расторг|прекращен|отказаться/.test(text)
-    ) {
-        return "Срок расторжения";
-    }
-
-
-    if (
-        /уведом/.test(text)
-    ) {
-        return "Срок уведомления";
-    }
-
-
-    if (
-        /оплат|платеж|аванс|предоплат/.test(text)
-    ) {
-        return "Срок оплаты";
-    }
-
-
-    if (
-        /продл|пролонг|срок действия/.test(text)
-    ) {
-        return "Срок действия";
-    }
-
-
-    if (
-        /действует|действия договора/.test(text)
-    ) {
-        return "Срок действия";
-    }
-
-
-    if (
-        /исполн|оказания услуг|предоставлен/.test(text)
-    ) {
-        return "Срок исполнения";
-    }
-
-
-    return "Срок или период";
-}
-
-
-function createDeadlineKey(title) {
-
-    return title
-        .toLowerCase()
-        .replace(/[^а-яёa-z0-9]+/gi, "-")
-        .replace(/^-+|-+$/g, "");
-}
-
-
-function deadlineDescription(title) {
-
-    switch (title) {
-
-        case "Срок расторжения":
-            return "Период или дата, связанные с прекращением договора.";
-
-        case "Срок уведомления":
-            return "Когда необходимо предупредить другую сторону.";
-
-        case "Срок оплаты":
-            return "Когда необходимо внести оплату.";
-
-        case "Срок действия":
-            return "Период действия договора или услуги.";
-
-        case "Срок исполнения":
-            return "Срок выполнения обязательства или оказания услуги.";
-
-        default:
-            return "Найденный срок, период или дата.";
-    }
-}
-
-
-// ======================================================
-// РАЗБИЕНИЕ НА ПРЕДЛОЖЕНИЯ
-// ======================================================
-
-function splitIntoSentences(text) {
-
-    const cleaned =
-        text
-            .replace(/\[Страница\s+\d+\]/gi, " ")
-            .replace(/\r/g, " ")
-            .replace(/\n+/g, " ")
-            .replace(/\s+/g, " ")
-            .trim();
-
-
-    /*
-     * Сначала разбиваем по обычной пунктуации.
-     */
-
-    const raw =
-        cleaned
-            .split(/(?<=[.!?;])\s+(?=[А-ЯЁA-Z0-9«"„])/)
-            .map(value => value.trim())
-            .filter(value => value.length >= 8);
-
-
-    /*
-     * Если PDF плохо расставил точки,
-     * дополнительно режем чрезмерно длинные куски.
-     */
-
-    const result = [];
-
-
-    for (const sentence of raw) {
-
-        if (sentence.length <= 650) {
-
-            result.push(sentence);
-
-            continue;
-        }
-
-
-        const parts =
-            sentence.split(
-                /(?=\b(?:при|если|в случае|в течение|не позднее|не ранее|не менее|не более|стоимость|оплата|штраф|пеня|комиссия)\b)/i
+            renderAnalysis(
+                currentAnalysis,
+                file
             );
 
 
-        if (parts.length <= 1) {
+            scrollToAnalysis();
 
-            result.push(
-                sentence.slice(0, 900)
+
+        } catch (error) {
+
+            console.error(error);
+
+            showError(
+                error?.message ||
+                "Не удалось проанализировать документ."
+            );
+        }
+    }
+
+
+    // ============================================================
+    // ПРОВЕРКА ФАЙЛА
+    // ============================================================
+
+    function validateFile(file) {
+
+        if (!file) {
+            return false;
+        }
+
+
+        if (file.size > MAX_FILE_SIZE) {
+
+            showError(
+                "Файл слишком большой. Максимальный размер — 20 МБ."
             );
 
-        } else {
+            return false;
+        }
 
-            for (const part of parts) {
 
-                const trimmed =
-                    part.trim();
+        const allowedTypes = [
+            "application/pdf",
+            "image/jpeg",
+            "image/png"
+        ];
 
-                if (trimmed.length >= 8) {
-                    result.push(trimmed);
+
+        const allowedExtensions = [
+            ".pdf",
+            ".jpg",
+            ".jpeg",
+            ".png"
+        ];
+
+
+        const lowerName =
+            file.name.toLowerCase();
+
+
+        const extensionAllowed =
+            allowedExtensions.some(
+                extension =>
+                    lowerName.endsWith(extension)
+            );
+
+
+        if (
+            !allowedTypes.includes(file.type) &&
+            !extensionAllowed
+        ) {
+
+            showError(
+                "Поддерживаются только PDF, JPG и PNG."
+            );
+
+            return false;
+        }
+
+
+        return true;
+    }
+
+
+    // ============================================================
+    // СОСТОЯНИЕ ЗАГРУЗКИ
+    // ============================================================
+
+    function showProcessingState(file) {
+
+        uploadCard.classList.add("processing");
+
+
+        uploadCard.innerHTML = `
+
+            <div class="upload-icon processing-icon">
+                ↻
+            </div>
+
+            <h2>
+                Анализируем документ
+            </h2>
+
+            <p class="processing-file">
+                ${escapeHtml(file.name)}
+            </p>
+
+            <div class="processing-loader">
+                <div class="processing-loader-bar"></div>
+            </div>
+
+            <div class="upload-note">
+                Извлекаем текст и ищем важные условия
+            </div>
+
+        `;
+
+
+        // Возвращаем input внутрь карточки,
+        // чтобы повторная загрузка продолжала работать.
+
+        uploadCard.appendChild(fileInput);
+    }
+
+
+    // ============================================================
+    // ОЧИСТКА ПРЕДЫДУЩЕГО РЕЗУЛЬТАТА
+    // ============================================================
+
+    function clearPreviousResult() {
+
+        if (!analysisResult) {
+            return;
+        }
+
+        analysisResult.innerHTML = "";
+
+        analysisResult.classList.remove("visible");
+
+        analysisResult.style.display = "none";
+    }
+
+
+    // ============================================================
+    // ОШИБКА
+    // ============================================================
+
+    function showError(message) {
+
+        if (!analysisResult) {
+            alert(message);
+            return;
+        }
+
+
+        analysisResult.style.display = "block";
+
+        analysisResult.classList.add("visible");
+
+
+        analysisResult.innerHTML = `
+
+            <div class="analysis-error">
+
+                <div class="analysis-error-icon">
+                    !
+                </div>
+
+                <div>
+                    <strong>
+                        Не удалось проанализировать документ
+                    </strong>
+
+                    <p>
+                        ${escapeHtml(message)}
+                    </p>
+                </div>
+
+            </div>
+
+        `;
+
+
+        scrollToAnalysis();
+    }
+
+
+    // ============================================================
+    // PDF.JS
+    // ============================================================
+
+    function loadPdfJs() {
+
+        if (window.pdfjsLib) {
+            return Promise.resolve(window.pdfjsLib);
+        }
+
+
+        if (pdfjsPromise) {
+            return pdfjsPromise;
+        }
+
+
+        pdfjsPromise = new Promise((resolve, reject) => {
+
+            const script =
+                document.createElement("script");
+
+            script.src = PDFJS_URL;
+
+            script.onload = () => {
+
+                if (!window.pdfjsLib) {
+
+                    reject(
+                        new Error(
+                            "PDF.js не загрузился."
+                        )
+                    );
+
+                    return;
                 }
-            }
-        }
+
+
+                window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+                    PDFJS_WORKER_URL;
+
+
+                resolve(window.pdfjsLib);
+            };
+
+
+            script.onerror = () => {
+
+                reject(
+                    new Error(
+                        "Не удалось загрузить PDF.js."
+                    )
+                );
+            };
+
+
+            document.head.appendChild(script);
+        });
+
+
+        return pdfjsPromise;
     }
 
 
-    return removeDuplicateStrings(result);
-}
+    // ============================================================
+    // TESSERACT
+    // ============================================================
 
+    function loadTesseract() {
 
-// ======================================================
-// НОРМАЛИЗАЦИЯ
-// ======================================================
-
-function normalizeText(text) {
-
-    if (!text) {
-        return "";
-    }
-
-
-    return String(text)
-
-        // типичные ошибки OCR
-        .replace(/\u00A0/g, " ")
-
-        .replace(/[ \t]+/g, " ")
-
-        .replace(/\n[ \t]+/g, "\n")
-
-        .replace(/[ \t]+\n/g, "\n")
-
-        .replace(/\n{3,}/g, "\n\n")
-
-        // странные OCR-разрывы
-        .replace(/(\w)-\s*\n\s*(\w)/g, "$1$2")
-
-        .trim();
-}
-
-
-// ======================================================
-// СВОДКА
-// ======================================================
-
-function createSummary(
-    categories,
-    groupCount,
-    fragmentCount,
-    text
-) {
-
-    if (groupCount === 0) {
-
-        return {
-            title: "Явных условий не найдено",
-            description:
-                "В тексте не удалось обнаружить знакомые нам формулировки. Это не означает, что документ не содержит важных условий."
-        };
-    }
-
-
-    const categoryNames = [];
-
-
-    if (categories.important.length) {
-        categoryNames.push("важные условия");
-    }
-
-    if (categories.worth.length) {
-        categoryNames.push("дополнительные условия");
-    }
-
-    if (categories.money.length) {
-        categoryNames.push("денежные условия");
-    }
-
-    if (categories.deadlines.length) {
-        categoryNames.push("сроки");
-    }
-
-    if (categories.data.length) {
-        categoryNames.push("данные");
-    }
-
-    if (categories.restrictions.length) {
-        categoryNames.push("ограничения");
-    }
-
-
-    return {
-        title:
-            `Найдено ${groupCount} ${plural(
-                groupCount,
-                "группа",
-                "группы",
-                "групп"
-            )} условий`,
-
-        description:
-            `Мы нашли ${fragmentCount} ${plural(
-                fragmentCount,
-                "фрагмент",
-                "фрагмента",
-                "фрагментов"
-            )} в категориях: ${categoryNames.join(", ")}.`
-    };
-}
-
-
-// ======================================================
-// УДАЛЕНИЕ ДУБЛИКАТОВ ГРУПП
-// ======================================================
-
-function removeDuplicateGroups(groups) {
-
-    const result = [];
-    const seen = new Set();
-
-
-    for (const group of groups) {
-
-        if (!group) {
-            continue;
+        if (window.Tesseract) {
+            return Promise.resolve(window.Tesseract);
         }
 
 
-        const normalizedTitle =
-            String(group.title || "")
-                .toLowerCase()
-                .replace(/\s+/g, " ")
-                .trim();
+        if (tesseractPromise) {
+            return tesseractPromise;
+        }
 
 
-        const key =
-            `${group.key || normalizedTitle}`;
+        tesseractPromise = new Promise((resolve, reject) => {
+
+            const script =
+                document.createElement("script");
+
+            script.src = TESSERACT_URL;
+
+            script.onload = () => {
+
+                if (!window.Tesseract) {
+
+                    reject(
+                        new Error(
+                            "Tesseract.js не загрузился."
+                        )
+                    );
+
+                    return;
+                }
 
 
-        if (seen.has(key)) {
+                resolve(window.Tesseract);
+            };
 
-            const existing =
-                result.find(
-                    item => item.key === group.key
+
+            script.onerror = () => {
+
+                reject(
+                    new Error(
+                        "Не удалось загрузить OCR."
+                    )
+                );
+            };
+
+
+            document.head.appendChild(script);
+        });
+
+
+        return tesseractPromise;
+    }
+
+
+    // ============================================================
+    // ИЗВЛЕЧЕНИЕ ТЕКСТА
+    // ============================================================
+
+    async function extractText(file) {
+
+        const isPdf =
+            file.type === "application/pdf" ||
+            file.name.toLowerCase().endsWith(".pdf");
+
+
+        if (isPdf) {
+
+            return await extractPdfText(file);
+        }
+
+
+        return await extractImageText(file);
+    }
+
+
+    // ============================================================
+    // PDF TEXT
+    // ============================================================
+
+    async function extractPdfText(file) {
+
+        const pdfjs =
+            await loadPdfJs();
+
+
+        const arrayBuffer =
+            await file.arrayBuffer();
+
+
+        const pdf =
+            await pdfjs.getDocument({
+                data: arrayBuffer
+            }).promise;
+
+
+        let fullText = "";
+
+
+        for (
+            let pageNumber = 1;
+            pageNumber <= pdf.numPages;
+            pageNumber++
+        ) {
+
+            const page =
+                await pdf.getPage(pageNumber);
+
+
+            const content =
+                await page.getTextContent();
+
+
+            const pageText =
+                content.items
+                    .map(item => item.str || "")
+                    .join(" ");
+
+
+            fullText +=
+                "\n" +
+                pageText;
+        }
+
+
+        const cleaned =
+            normalizeText(fullText);
+
+
+        // --------------------------------------------------------
+        // ЕСЛИ PDF СКАН
+        // --------------------------------------------------------
+
+        if (cleaned.length < 80) {
+
+            return await ocrPdf(
+                pdf
+            );
+        }
+
+
+        return cleaned;
+    }
+
+
+    // ============================================================
+    // OCR PDF
+    // ============================================================
+
+    async function ocrPdf(pdf) {
+
+        const Tesseract =
+            await loadTesseract();
+
+
+        let result = "";
+
+
+        for (
+            let pageNumber = 1;
+            pageNumber <= pdf.numPages;
+            pageNumber++
+        ) {
+
+            const page =
+                await pdf.getPage(pageNumber);
+
+
+            const viewport =
+                page.getViewport({
+                    scale: 1.8
+                });
+
+
+            const canvas =
+                document.createElement("canvas");
+
+
+            const context =
+                canvas.getContext("2d");
+
+
+            canvas.width =
+                Math.ceil(viewport.width);
+
+
+            canvas.height =
+                Math.ceil(viewport.height);
+
+
+            await page.render({
+                canvasContext: context,
+                viewport
+            }).promise;
+
+
+            const dataUrl =
+                canvas.toDataURL("image/png");
+
+
+            const ocr =
+                await Tesseract.recognize(
+                    dataUrl,
+                    "rus+eng"
                 );
 
 
-            if (existing) {
-
-                existing.sources = removeDuplicateStrings([
-                    ...existing.sources,
-                    ...(group.sources || [])
-                ]);
-
-
-                existing.values = removeDuplicateStrings([
-                    ...(existing.values || []),
-                    ...(group.values || [])
-                ]);
-            }
-
-
-            continue;
+            result +=
+                "\n" +
+                (ocr?.data?.text || "");
         }
 
 
-        seen.add(key);
+        return normalizeText(result);
+    }
 
 
-        group.sources =
-            removeDuplicateStrings(
-                group.sources || []
+    // ============================================================
+    // OCR IMAGE
+    // ============================================================
+
+    async function extractImageText(file) {
+
+        const Tesseract =
+            await loadTesseract();
+
+
+        const result =
+            await Tesseract.recognize(
+                file,
+                "rus+eng"
             );
 
 
-        if (group.values) {
-
-            group.values =
-                removeDuplicateStrings(
-                    group.values
-                );
-        }
-
-
-        result.push(group);
+        return normalizeText(
+            result?.data?.text || ""
+        );
     }
 
 
-    return result;
-}
+    // ============================================================
+    // НОРМАЛИЗАЦИЯ
+    // ============================================================
+
+    function normalizeText(text) {
+
+        return String(text || "")
+            .replace(/\u00A0/g, " ")
+            .replace(/\r/g, "\n")
+            .replace(/[ \t]+/g, " ")
+            .replace(/\n{3,}/g, "\n\n")
+            .replace(/\s+([,.;:!?])/g, "$1")
+            .trim();
+    }
 
 
-// ======================================================
-// УДАЛЕНИЕ ДУБЛИКАТОВ СТРОК
-// ======================================================
+    // ============================================================
+    // ПРЕДЛОЖЕНИЯ
+    // ============================================================
 
-function removeDuplicateStrings(items) {
+    function splitSentences(text) {
 
-    const result = [];
-    const seen = new Set();
-
-
-    for (const item of items || []) {
-
-        const value =
-            String(item || "")
+        const prepared =
+            text
+                .replace(/\n+/g, " ")
                 .replace(/\s+/g, " ")
                 .trim();
 
+
+        if (!prepared) {
+            return [];
+        }
+
+
+        return prepared
+            .split(/(?<=[.!?;])\s+(?=[А-ЯA-ZЁ0-9])/u)
+            .map(item => item.trim())
+            .filter(item => item.length >= 15);
+    }
+
+
+    // ============================================================
+    // АНАЛИЗ ДОКУМЕНТА
+    // ============================================================
+
+    function analyzeDocument(text) {
+
+        const sentences =
+            splitSentences(text);
+
+
+        const result = {
+
+            important: [],
+            worth: [],
+            money: [],
+            deadlines: [],
+            data: [],
+            restrictions: []
+
+        };
+
+
+        // ========================================================
+        // ВАЖНО
+        // ========================================================
+
+        addRule(
+            result.important,
+            sentences,
+            {
+                title: "Автоматическое продление",
+
+                keywords: [
+                    "автоматическ",
+                    "продлевается",
+                    "продляется",
+                    "пролонгац",
+                    "если не уведом",
+                    "считается продленным"
+                ],
+
+                description:
+                    "Проверьте, продлевается ли договор автоматически и когда его можно прекратить."
+            }
+        );
+
+
+        addRule(
+            result.important,
+            sentences,
+            {
+                title: "Штрафы и санкции",
+
+                keywords: [
+                    "штраф",
+                    "штрафн",
+                    "санкци",
+                    "неустойк"
+                ],
+
+                description:
+                    "В документе предусмотрены штрафы или другие санкции."
+            }
+        );
+
+
+        addRule(
+            result.important,
+            sentences,
+            {
+                title: "Пени за просрочку",
+
+                keywords: [
+                    "пеня",
+                    "пени",
+                    "за каждый день просрочки",
+                    "за каждый день"
+                ],
+
+                description:
+                    "Проверьте размер пени и условия её начисления."
+            }
+        );
+
+
+        addRule(
+            result.important,
+            sentences,
+            {
+                title: "Изменение условий",
+
+                keywords: [
+                    "вправе изменить",
+                    "может изменить",
+                    "изменяет стоимость",
+                    "изменение стоимости",
+                    "в одностороннем порядке",
+                    "без дополнительного соглашения"
+                ],
+
+                description:
+                    "Проверьте, может ли одна из сторон изменить условия договора без отдельного согласования."
+            }
+        );
+
+
+        addRule(
+            result.important,
+            sentences,
+            {
+                title: "Расторжение договора",
+
+                keywords: [
+                    "расторжени",
+                    "расторгнуть",
+                    "прекратить договор",
+                    "отказаться от договора",
+                    "отказ от договора"
+                ],
+
+                description:
+                    "Проверьте порядок расторжения и возможные условия отказа от договора."
+            }
+        );
+
+
+        // ========================================================
+        // СТОИТ ЗНАТЬ
+        // ========================================================
+
+        addRule(
+            result.worth,
+            sentences,
+            {
+                title: "Оплата",
+
+                keywords: [
+                    "оплат",
+                    "платеж",
+                    "внести плату",
+                    "внести оплату",
+                    "ежемесячн"
+                ],
+
+                description:
+                    "В документе указаны условия оплаты."
+            }
+        );
+
+
+        addRule(
+            result.worth,
+            sentences,
+            {
+                title: "Комиссии",
+
+                keywords: [
+                    "комисси",
+                    "сбор",
+                    "дополнительная плата",
+                    "сервисный сбор"
+                ],
+
+                description:
+                    "Проверьте дополнительные комиссии и сборы."
+            }
+        );
+
+
+        addRule(
+            result.worth,
+            sentences,
+            {
+                title: "Уведомления",
+
+                keywords: [
+                    "уведом",
+                    "извещ",
+                    "сообщить",
+                    "сообщени",
+                    "направить уведомление"
+                ],
+
+                description:
+                    "Проверьте, как и в какие сроки стороны должны уведомлять друг друга."
+            }
+        );
+
+
+        addRule(
+            result.worth,
+            sentences,
+            {
+                title: "Реклама и рассылки",
+
+                keywords: [
+                    "реклам",
+                    "рассылк",
+                    "маркетингов",
+                    "информационн",
+                    "смс"
+                ],
+
+                description:
+                    "В документе могут содержаться условия о рекламных или информационных сообщениях."
+            }
+        );
+
+
+        // ========================================================
+        // ДАННЫЕ
+        // ========================================================
+
+        addRule(
+            result.data,
+            sentences,
+            {
+                title: "Персональные данные",
+
+                keywords: [
+                    "персональн",
+                    "обработка персональных",
+                    "согласие на обработку",
+                    "оператор персональных"
+                ],
+
+                description:
+                    "Документ содержит условия обработки персональных данных."
+            }
+        );
+
+
+        addRule(
+            result.data,
+            sentences,
+            {
+                title: "Передача данных третьим лицам",
+
+                keywords: [
+                    "третьим лицам",
+                    "третьих лиц",
+                    "передач",
+                    "предоставлени",
+                    "партнерам",
+                    "партнёрам"
+                ],
+
+                description:
+                    "Проверьте, кому и при каких условиях могут передаваться данные."
+            }
+        );
+
+
+        // ========================================================
+        // ОГРАНИЧЕНИЯ
+        // ========================================================
+
+        addRule(
+            result.restrictions,
+            sentences,
+            {
+                title: "Ограничение ответственности",
+
+                keywords: [
+                    "ограничивает ответственность",
+                    "ограничение ответственности",
+                    "не несет ответственности",
+                    "не несёт ответственности",
+                    "не отвечает за",
+                    "ответственность не распространяется"
+                ],
+
+                description:
+                    "Проверьте, за какие последствия сторона договора снимает или ограничивает свою ответственность."
+            }
+        );
+
+
+        addRule(
+            result.restrictions,
+            sentences,
+            {
+                title: "Ограничения для клиента",
+
+                keywords: [
+                    "запрещается",
+                    "не допускается",
+                    "не вправе",
+                    "ограничен",
+                    "ограничено",
+                    "запрет"
+                ],
+
+                description:
+                    "В документе обнаружены ограничения или запреты."
+            }
+        );
+
+
+        // ========================================================
+        // ДЕНЬГИ
+        // ========================================================
+
+        result.money =
+            extractMoneyFindings(sentences);
+
+
+        // ========================================================
+        // СРОКИ
+        // ========================================================
+
+        result.deadlines =
+            extractDeadlineFindings(sentences);
+
+
+        // ========================================================
+        // УДАЛЯЕМ ДУБЛИКАТЫ
+        // ========================================================
+
+        result.important =
+            deduplicateFindings(result.important);
+
+        result.worth =
+            deduplicateFindings(result.worth);
+
+        result.money =
+            deduplicateFindings(result.money);
+
+        result.deadlines =
+            deduplicateFindings(result.deadlines);
+
+        result.data =
+            deduplicateFindings(result.data);
+
+        result.restrictions =
+            deduplicateFindings(result.restrictions);
+
+
+        return result;
+    }
+
+
+    // ============================================================
+    // ПРАВИЛО
+    // ============================================================
+
+    function addRule(
+        target,
+        sentences,
+        rule
+    ) {
+
+        const matches = [];
+
+
+        for (const sentence of sentences) {
+
+            const lower =
+                sentence.toLowerCase();
+
+
+            const matched =
+                rule.keywords.some(
+                    keyword =>
+                        lower.includes(
+                            keyword.toLowerCase()
+                        )
+                );
+
+
+            if (matched) {
+
+                matches.push(
+                    cleanSource(sentence)
+                );
+            }
+        }
+
+
+        if (!matches.length) {
+            return;
+        }
+
+
+        target.push({
+
+            title: rule.title,
+
+            description: rule.description,
+
+            sources:
+                uniqueSources(matches)
+
+        });
+    }
+
+
+    // ============================================================
+    // ДЕНЬГИ
+    // ============================================================
+
+    function extractMoneyFindings(sentences) {
+
+        const findings = [];
+
+
+        const moneyRegex =
+            /(\d[\d\s.,]*\s*(?:₽|руб(?:\.|лей|ля)?|р\.))\b/giu;
+
+
+        const percentRegex =
+            /(\d+(?:[.,]\d+)?)\s*%/gu;
+
+
+        for (const sentence of sentences) {
+
+            const moneyMatches =
+                [...sentence.matchAll(moneyRegex)];
+
+
+            const percentMatches =
+                [...sentence.matchAll(percentRegex)];
+
+
+            // ----------------------------------------------------
+            // ДЕНЬГИ
+            // ----------------------------------------------------
+
+            for (const match of moneyMatches) {
+
+                const value =
+                    normalizeMoneyValue(
+                        match[1]
+                    );
+
+
+                if (!value) {
+                    continue;
+                }
+
+
+                const title =
+                    detectMoneyTitle(
+                        sentence
+                    );
+
+
+                findings.push({
+
+                    title,
+
+                    description:
+                        buildMoneyDescription(
+                            value,
+                            sentence
+                        ),
+
+                    values: [
+                        value
+                    ],
+
+                    sources: [
+                        cleanSource(sentence)
+                    ]
+
+                });
+            }
+
+
+            // ----------------------------------------------------
+            // ПРОЦЕНТЫ
+            // ----------------------------------------------------
+
+            for (const match of percentMatches) {
+
+                const value =
+                    `${match[1].replace(",", ".")}%`;
+
+
+                const title =
+                    detectPercentTitle(
+                        sentence
+                    );
+
+
+                findings.push({
+
+                    title,
+
+                    description:
+                        buildPercentDescription(
+                            value,
+                            sentence
+                        ),
+
+                    values: [
+                        value
+                    ],
+
+                    sources: [
+                        cleanSource(sentence)
+                    ]
+
+                });
+            }
+        }
+
+
+        return findings;
+    }
+
+
+    // ============================================================
+    // НАЗВАНИЕ ДЕНЕЖНОГО ПУНКТА
+    // ============================================================
+
+    function detectMoneyTitle(sentence) {
+
+        const text =
+            sentence.toLowerCase();
+
+
+        if (
+            text.includes("штраф") ||
+            text.includes("неустой")
+        ) {
+            return "Штраф или неустойка";
+        }
+
+
+        if (
+            text.includes("пеня") ||
+            text.includes("пени")
+        ) {
+            return "Пеня";
+        }
+
+
+        if (
+            text.includes("комисси") ||
+            text.includes("сбор")
+        ) {
+            return "Комиссия или сбор";
+        }
+
+
+        if (
+            text.includes("ежемесяч") ||
+            text.includes("месяц")
+        ) {
+            return "Стоимость услуги";
+        }
+
+
+        if (
+            text.includes("оплат") ||
+            text.includes("платеж") ||
+            text.includes("стоимост") ||
+            text.includes("цена")
+        ) {
+            return "Стоимость / платёж";
+        }
+
+
+        return "Денежное условие";
+    }
+
+
+    function detectPercentTitle(sentence) {
+
+        const text =
+            sentence.toLowerCase();
+
+
+        if (
+            text.includes("штраф") ||
+            text.includes("неустой")
+        ) {
+            return "Процент штрафа";
+        }
+
+
+        if (
+            text.includes("пеня") ||
+            text.includes("пени")
+        ) {
+            return "Процент пени";
+        }
+
+
+        if (
+            text.includes("комисси")
+        ) {
+            return "Комиссия";
+        }
+
+
+        if (
+            text.includes("скид")
+        ) {
+            return "Скидка";
+        }
+
+
+        if (
+            text.includes("ставк")
+        ) {
+            return "Ставка";
+        }
+
+
+        return "Процентное условие";
+    }
+
+
+    function normalizeMoneyValue(value) {
 
         if (!value) {
-            continue;
+            return "";
         }
 
 
-        const key =
-            value.toLowerCase();
+        return value
+            .replace(/\s+/g, " ")
+            .replace(/\s*руб(?:\.|лей|ля)?/giu, " ₽")
+            .replace(/\s*р\./giu, " ₽")
+            .replace(/\s*₽/gu, " ₽")
+            .trim();
+    }
 
 
-        if (seen.has(key)) {
-            continue;
+    function buildMoneyDescription(
+        value,
+        sentence
+    ) {
+
+        const context =
+            shortenSource(
+                sentence,
+                260
+            );
+
+
+        return `${value} — ${context}`;
+    }
+
+
+    function buildPercentDescription(
+        value,
+        sentence
+    ) {
+
+        const context =
+            shortenSource(
+                sentence,
+                260
+            );
+
+
+        return `${value} — ${context}`;
+    }
+
+
+    // ============================================================
+    // СРОКИ
+    // ============================================================
+
+    function extractDeadlineFindings(sentences) {
+
+        const findings = [];
+
+
+        const durationRegex =
+            /(\d+(?:[.,]\d+)?)\s*(дн(?:ей|я)?|день|недел(?:я|и|ь)|месяц(?:а|ев)?|год(?:а|ов)?|час(?:а|ов)?)/giu;
+
+
+        const dateRegex =
+            /\b(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\b/g;
+
+
+        for (const sentence of sentences) {
+
+            const durations =
+                [...sentence.matchAll(durationRegex)];
+
+
+            const dates =
+                [...sentence.matchAll(dateRegex)];
+
+
+            for (const match of durations) {
+
+                const value =
+                    `${match[1]} ${normalizeUnit(match[2])}`;
+
+
+                const title =
+                    detectDeadlineTitle(
+                        sentence
+                    );
+
+
+                findings.push({
+
+                    title,
+
+                    description:
+                        `${value} — ${shortenSource(sentence, 260)}`,
+
+                    values: [
+                        value
+                    ],
+
+                    sources: [
+                        cleanSource(sentence)
+                    ]
+
+                });
+            }
+
+
+            for (const match of dates) {
+
+                const value =
+                    match[1];
+
+
+                const title =
+                    detectDeadlineTitle(
+                        sentence
+                    );
+
+
+                findings.push({
+
+                    title,
+
+                    description:
+                        `${value} — ${shortenSource(sentence, 260)}`,
+
+                    values: [
+                        value
+                    ],
+
+                    sources: [
+                        cleanSource(sentence)
+                    ]
+
+                });
+            }
         }
 
 
-        seen.add(key);
-        result.push(value);
+        return findings;
     }
 
 
-    return result;
-}
+    function normalizeUnit(unit) {
+
+        const value =
+            unit.toLowerCase();
 
 
-// ======================================================
-// ОТОБРАЖЕНИЕ РЕЗУЛЬТАТА
-// ======================================================
-
-function renderAnalysisResult(
-    analysis,
-    originalText
-) {
-
-    const existing =
-        document.querySelector(".analysis-result");
+        if (
+            value.startsWith("дн") ||
+            value === "день"
+        ) {
+            return "дней";
+        }
 
 
-    if (existing) {
-        existing.remove();
+        if (
+            value.startsWith("недел")
+        ) {
+            return "недель";
+        }
+
+
+        if (
+            value.startsWith("месяц")
+        ) {
+            return "месяцев";
+        }
+
+
+        if (
+            value.startsWith("год")
+        ) {
+            return "лет";
+        }
+
+
+        if (
+            value.startsWith("час")
+        ) {
+            return "часов";
+        }
+
+
+        return unit;
     }
 
 
-    const categories =
-        analysis.categories;
+    function detectDeadlineTitle(sentence) {
+
+        const text =
+            sentence.toLowerCase();
 
 
-    const result =
-        document.createElement("section");
+        if (
+            text.includes("уведом")
+        ) {
+            return "Срок уведомления";
+        }
 
 
-    result.className =
-        "analysis-result";
+        if (
+            text.includes("оплат")
+        ) {
+            return "Срок оплаты";
+        }
 
 
-    result.id =
-        "analysisResult";
+        if (
+            text.includes("расторж")
+        ) {
+            return "Срок расторжения";
+        }
 
 
-    const totalGroups =
-        analysis.stats.groupCount;
+        if (
+            text.includes("достав")
+        ) {
+            return "Срок доставки";
+        }
 
 
-    const totalFragments =
-        analysis.stats.fragmentCount;
+        if (
+            text.includes("действ")
+        ) {
+            return "Срок действия";
+        }
 
 
-    result.innerHTML = `
-
-        <div class="analysis-result-inner">
-
-            <div class="result-heading">
-
-                <div class="result-heading-left">
-
-                    <div class="section-label">
-                        РЕЗУЛЬТАТ АНАЛИЗА
-                    </div>
-
-                    <h2>
-                        Что найдено
-                    </h2>
-
-                    <p class="result-description">
-                        ${escapeHtml(
-                            analysis.summary.description
-                        )}
-                    </p>
-
-                </div>
-
-                <div class="result-stats">
-
-                    <div class="result-stat">
-
-                        <strong>
-                            ${totalGroups}
-                        </strong>
-
-                        <span>
-                            ${plural(
-                                totalGroups,
-                                "группа",
-                                "группы",
-                                "групп"
-                            )}
-                        </span>
-
-                    </div>
-
-                    <div class="result-stat">
-
-                        <strong>
-                            ${totalFragments}
-                        </strong>
-
-                        <span>
-                            ${plural(
-                                totalFragments,
-                                "фрагмент",
-                                "фрагмента",
-                                "фрагментов"
-                            )}
-                        </span>
-
-                    </div>
-
-                </div>
-
-            </div>
+        if (
+            text.includes("предупред")
+        ) {
+            return "Срок предупреждения";
+        }
 
 
-            <div class="result-grid">
-
-                ${renderResultCategoryCard(
-                    "important",
-                    "Важно",
-                    "Условия, которые стоит проверить в первую очередь.",
-                    categories.important,
-                    "!"
-                )}
-
-                ${renderResultCategoryCard(
-                    "worth",
-                    "Стоит знать",
-                    "Другие существенные условия документа.",
-                    categories.worth,
-                    "i"
-                )}
-
-                ${renderResultCategoryCard(
-                    "money",
-                    "Деньги",
-                    "Стоимость, платежи, комиссии, штрафы и проценты.",
-                    categories.money,
-                    "₽"
-                )}
-
-                ${renderResultCategoryCard(
-                    "deadlines",
-                    "Сроки",
-                    "Даты, периоды и сроки уведомления или оплаты.",
-                    categories.deadlines,
-                    "◷"
-                )}
-
-                ${renderResultCategoryCard(
-                    "data",
-                    "Данные",
-                    "Персональные данные и их возможная передача.",
-                    categories.data,
-                    "◎"
-                )}
-
-                ${renderResultCategoryCard(
-                    "restrictions",
-                    "Ограничения",
-                    "Запреты и ограничения ответственности.",
-                    categories.restrictions,
-                    "⊘"
-                )}
-
-            </div>
+        if (
+            text.includes("ответ")
+        ) {
+            return "Срок ответа";
+        }
 
 
-            <div class="result-hint">
-                Нажмите на категорию, чтобы посмотреть подробности
-            </div>
+        return "Срок / период";
+    }
 
 
-            <div class="result-note">
+    // ============================================================
+    // ОЧИСТКА ИСТОЧНИКА
+    // ============================================================
 
-                <strong>
-                    Важно
-                </strong>
+    function cleanSource(text) {
 
-                <span>
-                    Автоматический анализ помогает обратить
-                    внимание на условия документа, но не заменяет
-                    юридическую консультацию.
-                </span>
-
-            </div>
-
-        </div>
-
-    `;
+        return String(text || "")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
 
 
-    /*
-     * Вставляем после hero/features/example,
-     * но перед footer.
-     */
+    function shortenSource(
+        text,
+        maxLength = 260
+    ) {
 
-    const footer =
-        document.querySelector(".footer");
+        const clean =
+            cleanSource(text);
 
 
-    if (footer && footer.parentNode) {
+        if (
+            clean.length <= maxLength
+        ) {
+            return clean;
+        }
 
-        footer.parentNode.insertBefore(
-            result,
-            footer
+
+        return (
+            clean.slice(0, maxLength - 1)
+            .trim() +
+            "…"
         );
-
-    } else {
-
-        document.body.appendChild(result);
     }
 
 
-    initResultCards(
-        analysis
-    );
-}
+    function uniqueSources(
+        sources
+    ) {
 
-
-// ======================================================
-// КАРТОЧКА КАТЕГОРИИ
-// ======================================================
-
-function renderResultCategoryCard(
-    key,
-    title,
-    description,
-    groups,
-    icon
-) {
-
-    const groupCount =
-        Array.isArray(groups)
-            ? groups.length
-            : 0;
-
-
-    if (groupCount === 0) {
-
-        return "";
+        return [
+            ...new Set(
+                sources
+                    .map(cleanSource)
+                    .filter(Boolean)
+            )
+        ];
     }
 
 
-    const fragmentCount =
-        groups.reduce(
-            (sum, group) =>
-                sum +
-                (group.sources
-                    ? group.sources.length
-                    : 0),
-            0
-        );
+    // ============================================================
+    // ДЕДУПЛИКАЦИЯ
+    // ============================================================
+
+    function deduplicateFindings(
+        findings
+    ) {
+
+        const map =
+            new Map();
 
 
-    let meta = "";
+        for (const finding of findings) {
+
+            const key =
+                `${finding.title}::${(finding.description || "").slice(0, 120)}`;
 
 
-    if (key === "money") {
+            if (!map.has(key)) {
 
-        const values =
-            groups.reduce(
+                map.set(
+                    key,
+                    {
+                        ...finding,
+
+                        sources: [
+                            ...(finding.sources || [])
+                        ],
+
+                        values: [
+                            ...(finding.values || [])
+                        ]
+
+                    }
+                );
+
+                continue;
+            }
+
+
+            const existing =
+                map.get(key);
+
+
+            existing.sources =
+                uniqueSources([
+                    ...(existing.sources || []),
+                    ...(finding.sources || [])
+                ]);
+
+
+            existing.values =
+                [
+                    ...new Set([
+                        ...(existing.values || []),
+                        ...(finding.values || [])
+                    ])
+                ];
+        }
+
+
+        return [...map.values()];
+    }
+
+
+    // ============================================================
+    // РЕНДЕР АНАЛИЗА
+    // ============================================================
+
+    function renderAnalysis(
+        analysis,
+        file
+    ) {
+
+        if (!analysisResult) {
+            return;
+        }
+
+
+        const groups = [
+            {
+                key: "important",
+                title: "Важно",
+                icon: "!",
+                className: "danger",
+                items: analysis.important
+            },
+
+            {
+                key: "worth",
+                title: "Стоит знать",
+                icon: "↻",
+                className: "warning",
+                items: analysis.worth
+            },
+
+            {
+                key: "money",
+                title: "Деньги",
+                icon: "₽",
+                className: "money",
+                items: analysis.money
+            },
+
+            {
+                key: "deadlines",
+                title: "Сроки",
+                icon: "◷",
+                className: "deadline",
+                items: analysis.deadlines
+            },
+
+            {
+                key: "data",
+                title: "Данные",
+                icon: "i",
+                className: "data",
+                items: analysis.data
+            },
+
+            {
+                key: "restrictions",
+                title: "Ограничения",
+                icon: "×",
+                className: "restriction",
+                items: analysis.restrictions
+            }
+        ];
+
+
+        const nonEmptyGroups =
+            groups.filter(
+                group =>
+                    group.items &&
+                    group.items.length
+            );
+
+
+        const totalFindings =
+            nonEmptyGroups.reduce(
                 (sum, group) =>
-                    sum +
-                    (group.values
-                        ? group.values.length
-                        : 0),
+                    sum + group.items.length,
                 0
             );
 
 
-        meta =
-            `${groupCount} ${plural(
-                groupCount,
-                "условие",
-                "условия",
-                "условий"
-            )}` +
-            (values
-                ? ` · ${values} ${plural(
-                    values,
-                    "значение",
-                    "значения",
-                    "значений"
-                )}`
-                : "");
-
-    } else {
-
-        meta =
-            `${groupCount} ${plural(
-                groupCount,
-                "группа",
-                "группы",
-                "групп"
-            )}`;
-    }
+        const fileName =
+            file?.name ||
+            "Документ";
 
 
-    return `
+        analysisResult.innerHTML = `
 
-        <button
-            class="result-category-card result-category-${key}"
-            data-result-category="${key}"
-            type="button"
-        >
+            <div class="analysis-dashboard">
 
-            <span class="result-card-icon">
-                ${icon}
-            </span>
+                <div class="analysis-header">
 
-            <span class="result-card-content">
+                    <div>
 
-                <strong>
-                    ${escapeHtml(title)}
-                </strong>
+                        <div class="section-label">
+                            АНАЛИЗ ЗАВЕРШЁН
+                        </div>
 
-                <span class="result-card-description">
-                    ${escapeHtml(description)}
-                </span>
+                        <h2>
+                            Что найдено
+                        </h2>
 
-                <span class="result-card-meta">
-                    ${escapeHtml(meta)}
-                </span>
+                        <p class="analysis-file">
+                            ${escapeHtml(fileName)}
+                        </p>
 
-            </span>
+                    </div>
 
-            <span class="result-card-arrow">
-                →
-            </span>
+                    <div class="analysis-count">
 
-        </button>
+                        <strong>
+                            ${totalFindings}
+                        </strong>
 
-    `;
-}
+                        <span>
+                            ${
+                                pluralize(
+                                    totalFindings,
+                                    "пункт",
+                                    "пункта",
+                                    "пунктов"
+                                )
+                            }
+                        </span>
 
+                    </div>
 
-// ======================================================
-// КЛИКИ ПО КАТЕГОРИЯМ
-// ======================================================
-
-function initResultCards(analysis) {
-
-    const cards =
-        document.querySelectorAll(
-            "[data-result-category]"
-        );
-
-
-    cards.forEach(card => {
-
-        card.addEventListener(
-            "click",
-            () => {
-
-                const category =
-                    card.dataset.resultCategory;
-
-
-                const groups =
-                    analysis.categories[
-                        category
-                    ] || [];
-
-
-                openResultModal(
-                    category,
-                    groups
-                );
-            }
-        );
-    });
-}
-
-
-// ======================================================
-// МОДАЛКА РЕЗУЛЬТАТА
-// ======================================================
-
-function openResultModal(
-    category,
-    groups
-) {
-
-    closeResultModal();
-
-
-    const modal =
-        document.createElement("div");
-
-
-    modal.className =
-        `result-modal result-modal-${category}`;
-
-
-    modal.innerHTML = `
-
-        <div class="result-modal-overlay"></div>
-
-        <div
-            class="result-modal-card"
-            role="dialog"
-            aria-modal="true"
-        >
-
-            <button
-                class="result-modal-close"
-                type="button"
-                aria-label="Закрыть"
-            >
-                ×
-            </button>
-
-
-            <div class="result-modal-header">
-
-                <div class="result-modal-label">
-                    ${getCategoryLabel(category)}
                 </div>
 
-                <h3>
-                    ${escapeHtml(
-                        getCategoryTitle(category)
-                    )}
-                </h3>
-
-                <p>
-                    ${escapeHtml(
-                        getCategoryDescription(
-                            category
-                        )
-                    )}
-                </p>
-
-            </div>
-
-
-            <div class="result-detail-list">
 
                 ${
-                    groups.length
-                        ? groups
-                            .map(group =>
-                                renderDetailGroup(
-                                    group
-                                )
-                            )
-                            .join("")
-                        : renderEmptyDetail()
+                    nonEmptyGroups.length
+                        ? `
+                            <div class="analysis-grid">
+
+                                ${nonEmptyGroups
+                                    .map(
+                                        group =>
+                                            renderCategoryCard(
+                                                group
+                                            )
+                                    )
+                                    .join("")
+                                }
+
+                            </div>
+                          `
+                        : `
+                            <div class="analysis-empty">
+
+                                <div class="analysis-empty-icon">
+                                    ✓
+                                </div>
+
+                                <div>
+
+                                    <strong>
+                                        Явных проблемных условий не найдено
+                                    </strong>
+
+                                    <p>
+                                        Это не означает, что документ
+                                        полностью безопасен — внимательно
+                                        ознакомьтесь с его условиями.
+                                    </p>
+
+                                </div>
+
+                            </div>
+                          `
                 }
 
-            </div>
 
+                <div class="analysis-disclaimer">
 
-            <div class="result-modal-footer">
+                    Анализ носит информационный характер
+                    и не является юридической консультацией.
 
-                ${groups.length}
-
-                ${plural(
-                    groups.length,
-                    "группа условия",
-                    "группы условий",
-                    "групп условий"
-                )}
+                </div>
 
             </div>
 
-        </div>
-
-    `;
+        `;
 
 
-    document.body.appendChild(modal);
+        analysisResult.style.display = "block";
 
 
-    requestAnimationFrame(() => {
-        modal.classList.add("active");
-    });
+        // Небольшая задержка нужна,
+        // чтобы браузер успел отрисовать карточки.
+
+        requestAnimationFrame(() => {
+
+            analysisResult.classList.add("visible");
+
+            attachCategoryHandlers();
+        });
 
 
-    document.body.classList.add("modal-open");
-
-
-    const overlay =
-        modal.querySelector(
-            ".result-modal-overlay"
-        );
-
-
-    const closeButton =
-        modal.querySelector(
-            ".result-modal-close"
-        );
-
-
-    if (overlay) {
-
-        overlay.addEventListener(
-            "click",
-            closeResultModal
-        );
+        restoreUploadCard(file);
     }
 
 
-    if (closeButton) {
+    // ============================================================
+    // КАРТОЧКА КАТЕГОРИИ
+    // ============================================================
 
-        closeButton.addEventListener(
-            "click",
-            closeResultModal
-        );
+    function renderCategoryCard(
+        group
+    ) {
+
+        const count =
+            group.items.length;
+
+
+        return `
+
+            <button
+                class="analysis-category ${group.className}"
+                type="button"
+                data-category="${escapeHtml(group.key)}"
+            >
+
+                <span class="analysis-category-icon">
+                    ${escapeHtml(group.icon)}
+                </span>
+
+                <span class="analysis-category-content">
+
+                    <strong>
+                        ${escapeHtml(group.title)}
+                    </strong>
+
+                    <small>
+                        ${
+                            pluralize(
+                                count,
+                                "найденный пункт",
+                                "найденных пункта",
+                                "найденных пунктов"
+                            )
+                        }
+                    </small>
+
+                </span>
+
+                <span class="analysis-category-arrow">
+                    →
+                </span>
+
+            </button>
+
+        `;
     }
-}
 
 
-function closeResultModal() {
+    // ============================================================
+    // ОБРАБОТЧИКИ КАТЕГОРИЙ
+    // ============================================================
 
-    const modal =
-        document.querySelector(
-            ".result-modal"
-        );
+    function attachCategoryHandlers() {
 
-
-    if (!modal) {
-
-        if (!aboutModal?.classList.contains("active")) {
-            document.body.classList.remove("modal-open");
+        if (!analysisResult) {
+            return;
         }
 
-        return;
+
+        const buttons =
+            analysisResult.querySelectorAll(
+                ".analysis-category"
+            );
+
+
+        buttons.forEach(button => {
+
+            button.addEventListener(
+                "click",
+                () => {
+
+                    const category =
+                        button.dataset.category;
+
+
+                    const group =
+                        getAnalysisGroup(
+                            category
+                        );
+
+
+                    if (!group) {
+                        return;
+                    }
+
+
+                    openResultModal(
+                        group
+                    );
+                }
+            );
+        });
     }
 
 
-    modal.classList.remove("active");
+    function getAnalysisGroup(
+        key
+    ) {
+
+        if (!currentAnalysis) {
+            return null;
+        }
 
 
-    setTimeout(() => {
+        const titles = {
 
-        modal.remove();
+            important: "Важно",
+            worth: "Стоит знать",
+            money: "Деньги",
+            deadlines: "Сроки",
+            data: "Данные",
+            restrictions: "Ограничения"
+
+        };
+
 
         if (
-            !aboutModal?.classList.contains("active")
+            !currentAnalysis[key]
         ) {
+            return null;
+        }
+
+
+        return {
+
+            key,
+
+            title:
+                titles[key] ||
+                "Результаты",
+
+            items:
+                currentAnalysis[key]
+
+        };
+    }
+
+
+    // ============================================================
+    // МОДАЛКА РЕЗУЛЬТАТА
+    // ============================================================
+
+    function openResultModal(
+        group
+    ) {
+
+        closeResultModal();
+
+
+        const modal =
+            document.createElement("div");
+
+
+        modal.className =
+            "result-modal";
+
+
+        modal.innerHTML = `
+
+            <div class="result-modal-overlay"></div>
+
+            <div class="result-modal-card">
+
+                <button
+                    class="result-modal-close"
+                    type="button"
+                    aria-label="Закрыть"
+                >
+                    ×
+                </button>
+
+
+                <div class="section-label">
+                    НАЙДЕНО В ДОКУМЕНТЕ
+                </div>
+
+
+                <h2>
+                    ${escapeHtml(group.title)}
+                </h2>
+
+
+                <div class="result-modal-items">
+
+                    ${group.items
+                        .map(
+                            item =>
+                                renderFinding(
+                                    item
+                                )
+                        )
+                        .join("")
+                    }
+
+                </div>
+
+
+                <div class="result-modal-footer">
+
+                    Информация приведена
+                    в справочных целях.
+
+                </div>
+
+            </div>
+
+        `;
+
+
+        document.body.appendChild(modal);
+
+
+        document.body.classList.add(
+            "modal-open"
+        );
+
+
+        requestAnimationFrame(() => {
+
+            modal.classList.add("active");
+        });
+
+
+        const closeButton =
+            modal.querySelector(
+                ".result-modal-close"
+            );
+
+
+        const overlay =
+            modal.querySelector(
+                ".result-modal-overlay"
+            );
+
+
+        closeButton?.addEventListener(
+            "click",
+            () => closeResultModal()
+        );
+
+
+        overlay?.addEventListener(
+            "click",
+            () => closeResultModal()
+        );
+
+
+        modal._escHandler =
+            event => {
+
+                if (event.key === "Escape") {
+
+                    closeResultModal();
+                }
+            };
+
+
+        document.addEventListener(
+            "keydown",
+            modal._escHandler
+        );
+    }
+
+
+    function closeResultModal() {
+
+        const modal =
+            document.querySelector(
+                ".result-modal"
+            );
+
+
+        if (!modal) {
+            return;
+        }
+
+
+        if (modal._escHandler) {
+
+            document.removeEventListener(
+                "keydown",
+                modal._escHandler
+            );
+        }
+
+
+        modal.classList.remove("active");
+
+
+        setTimeout(() => {
+
+            modal.remove();
+
             document.body.classList.remove(
                 "modal-open"
             );
-        }
 
-    }, 180);
-}
-
-
-// ======================================================
-// ДЕТАЛЬНАЯ ГРУППА
-// ======================================================
-
-function renderDetailGroup(group) {
-
-    const values =
-        Array.isArray(group.values)
-            ? group.values
-            : [];
+        }, 180);
+    }
 
 
-    const sources =
-        Array.isArray(group.sources)
-            ? group.sources
-            : [];
+    // ============================================================
+    // ОТДЕЛЬНЫЙ РЕЗУЛЬТАТ
+    // ============================================================
+
+    function renderFinding(
+        finding
+    ) {
+
+        const values =
+            finding.values || [];
 
 
-    return `
-
-        <article class="result-detail-group">
-
-            <div class="detail-group-top">
-
-                <div class="detail-group-icon">
-                    ${escapeHtml(
-                        group.icon || "i"
-                    )}
-                </div>
-
-                <div class="detail-group-heading">
-
-                    <span>
-                        УСЛОВИЕ
-                    </span>
-
-                    <h4>
-                        ${escapeHtml(
-                            group.title
-                        )}
-                    </h4>
-
-                </div>
-
-            </div>
+        const sources =
+            finding.sources || [];
 
 
-            <p class="detail-group-description">
-                ${escapeHtml(
-                    group.description || ""
-                )}
-            </p>
+        return `
 
+            <article class="result-finding">
 
-            ${
-                values.length
-                    ? `
-                        <div class="detail-values">
+                <div class="result-finding-top">
 
-                            ${values
-                                .map(
-                                    value => `
-                                        <span class="detail-value">
-                                            ${escapeHtml(
-                                                value
-                                            )}
-                                        </span>
-                                    `
-                                )
-                                .join("")}
+                    <h3>
+                        ${escapeHtml(finding.title)}
+                    </h3>
 
-                        </div>
-                    `
-                    : ""
-            }
+                    ${
+                        values.length
+                            ? `
+                                <div class="result-values">
 
+                                    ${values
+                                        .map(
+                                            value =>
+                                                `<span>${escapeHtml(value)}</span>`
+                                        )
+                                        .join("")
+                                    }
 
-            <div class="detail-sources">
-
-                <div class="detail-source-label">
-                    ФРАГМЕНТЫ ДОКУМЕНТА
-                </div>
-
-                ${
-                    sources
-                        .slice(0, 8)
-                        .map(
-                            source => `
-                                <div class="detail-source">
-                                    ${escapeHtml(
-                                        source
-                                    )}
                                 </div>
-                            `
-                        )
-                        .join("")
-                }
+                              `
+                            : ""
+                    }
+
+                </div>
+
 
                 ${
-                    sources.length > 8
+                    finding.description
                         ? `
-                            <div class="detail-more">
-                                Ещё ${sources.length - 8}
-                                ${plural(
-                                    sources.length - 8,
-                                    "фрагмент",
-                                    "фрагмента",
-                                    "фрагментов"
+                            <p class="result-finding-description">
+                                ${escapeHtml(
+                                    finding.description
                                 )}
-                            </div>
-                        `
+                            </p>
+                          `
                         : ""
                 }
 
-            </div>
 
-        </article>
+                ${
+                    sources.length
+                        ? `
+                            <div class="result-source">
 
-    `;
-}
+                                <span>
+                                    Фрагмент документа
+                                </span>
 
+                                ${sources
+                                    .slice(0, 3)
+                                    .map(
+                                        source =>
+                                            `
+                                            <blockquote>
+                                                ${escapeHtml(
+                                                    shortenSource(
+                                                        source,
+                                                        420
+                                                    )
+                                                )}
+                                            </blockquote>
+                                            `
+                                    )
+                                    .join("")
+                                }
 
-function renderEmptyDetail() {
+                            </div>
+                          `
+                        : ""
+                }
 
-    return `
+            </article>
 
-        <div class="result-empty">
-            В этой категории ничего не найдено.
-        </div>
-
-    `;
-}
-
-
-// ======================================================
-// НАЗВАНИЯ КАТЕГОРИЙ
-// ======================================================
-
-function getCategoryLabel(category) {
-
-    switch (category) {
-
-        case "important":
-            return "ПРОВЕРЬТЕ";
-
-        case "worth":
-            return "СТОИТ ЗНАТЬ";
-
-        case "money":
-            return "ФИНАНСЫ";
-
-        case "deadlines":
-            return "СРОКИ";
-
-        case "data":
-            return "ПЕРСОНАЛЬНЫЕ ДАННЫЕ";
-
-        case "restrictions":
-            return "ОГРАНИЧЕНИЯ";
-
-        default:
-            return "РЕЗУЛЬТАТ";
-    }
-}
-
-
-function getCategoryTitle(category) {
-
-    switch (category) {
-
-        case "important":
-            return "Важные условия";
-
-        case "worth":
-            return "Стоит знать";
-
-        case "money":
-            return "Деньги";
-
-        case "deadlines":
-            return "Сроки";
-
-        case "data":
-            return "Данные";
-
-        case "restrictions":
-            return "Ограничения";
-
-        default:
-            return "Результат";
-    }
-}
-
-
-function getCategoryDescription(category) {
-
-    switch (category) {
-
-        case "important":
-            return "Условия, которые могут существенно повлиять на ваши обязательства.";
-
-        case "worth":
-            return "Другие условия, на которые стоит обратить внимание.";
-
-        case "money":
-            return "Стоимость, платежи, комиссии, штрафы и процентные условия.";
-
-        case "deadlines":
-            return "Сроки, даты, периоды и требования к уведомлению.";
-
-        case "data":
-            return "Условия обработки и передачи персональных данных.";
-
-        case "restrictions":
-            return "Ограничения, запреты и условия ответственности.";
-
-        default:
-            return "";
-    }
-}
-
-
-// ======================================================
-// ВЫБРАННЫЙ ФАЙЛ
-// ======================================================
-
-function showSelectedFile(file) {
-
-    if (!uploadCard) {
-        return;
+        `;
     }
 
 
-    uploadCard.innerHTML = `
+    // ============================================================
+    // ВОЗВРАТ КАРТОЧКИ ЗАГРУЗКИ
+    // ============================================================
 
-        <div class="selected-file">
+    function restoreUploadCard(
+        file
+    ) {
 
-            <div class="selected-file-icon">
-                ${getFileType(file) === "pdf" ? "PDF" : "IMG"}
-            </div>
-
-            <div class="selected-file-info">
-
-                <strong>
-                    ${escapeHtml(file.name)}
-                </strong>
-
-                <span>
-                    ${formatFileSize(file.size)}
-                </span>
-
-            </div>
-
-        </div>
-
-
-        <div
-            class="upload-status"
-            id="uploadStatus"
-        >
-            Подготавливаем документ…
-        </div>
-
-    `;
-
-
-    /*
-     * Важно:
-     * input удалился через innerHTML,
-     * поэтому возвращаем его обратно в карточку.
-     */
-
-    if (fileInput) {
-
-        fileInput.hidden = true;
-
-        uploadCard.appendChild(
-            fileInput
-        );
-    }
-}
-
-
-// ======================================================
-// СТАТУС
-// ======================================================
-
-function showStatus(
-    message,
-    type = "loading"
-) {
-
-    const status =
-        document.getElementById(
-            "uploadStatus"
+        uploadCard.classList.remove(
+            "processing"
         );
 
 
-    if (!status) {
-        return;
-    }
+        uploadCard.innerHTML = `
+
+            <div class="upload-icon">
+                ✓
+            </div>
+
+            <h2>
+                Документ проанализирован
+            </h2>
+
+            <p>
+                ${escapeHtml(file.name)}
+            </p>
+
+            <button
+                class="upload-button"
+                id="uploadButton"
+                type="button"
+            >
+                Выбрать другой файл
+            </button>
+
+            <div class="upload-note">
+                Можно загрузить другой документ
+            </div>
+
+        `;
 
 
-    status.textContent =
-        message;
+        // --------------------------------------------------------
+        // КРИТИЧЕСКИ ВАЖНО:
+        // input был сохранён как DOM-объект.
+        // Возвращаем его обратно.
+        // --------------------------------------------------------
+
+        uploadCard.appendChild(fileInput);
 
 
-    status.dataset.status =
-        type;
-}
-
-
-// ======================================================
-// ОЧИСТКА ПРЕДЫДУЩЕГО РЕЗУЛЬТАТА
-// ======================================================
-
-function clearPreviousResult() {
-
-    const result =
-        document.querySelector(
-            ".analysis-result"
-        );
-
-
-    if (result) {
-        result.remove();
-    }
-
-
-    closeResultModal();
-
-
-    if (aboutModal) {
-        aboutModal.classList.remove("active");
-    }
-
-
-    document.body.classList.remove(
-        "modal-open"
-    );
-}
-
-
-// ======================================================
-// ЗАГРУЗКА SCRIPT
-// ======================================================
-
-function loadScript(src) {
-
-    return new Promise(
-        (resolve, reject) => {
-
-            const existing =
-                document.querySelector(
-                    `script[src="${src}"]`
-                );
-
-
-            if (existing) {
-
-                existing.addEventListener(
-                    "load",
-                    resolve,
-                    { once: true }
-                );
-
-                existing.addEventListener(
-                    "error",
-                    reject,
-                    { once: true }
-                );
-
-                return;
-            }
-
-
-            const script =
-                document.createElement(
-                    "script"
-                );
-
-
-            script.src = src;
-
-            script.async = true;
-
-
-            script.onload =
-                () => resolve();
-
-            script.onerror =
-                () =>
-                    reject(
-                        new Error(
-                            `Не удалось загрузить ${src}`
-                        )
-                    );
-
-
-            document.head.appendChild(
-                script
+        const newUploadButton =
+            document.getElementById(
+                "uploadButton"
             );
+
+
+        newUploadButton?.addEventListener(
+            "click",
+            () => {
+
+                fileInput.value = "";
+
+                fileInput.click();
+            }
+        );
+    }
+
+
+    // ============================================================
+    // ПРОКРУТКА К АНАЛИЗУ
+    // ============================================================
+
+    function scrollToAnalysis() {
+
+        if (!analysisResult) {
+            return;
         }
-    );
-}
 
 
-// ======================================================
-// УТИЛИТЫ
-// ======================================================
+        setTimeout(() => {
 
-function cleanFindingText(text) {
+            analysisResult.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+            });
 
-    return String(text || "")
-        .replace(/\s+/g, " ")
-        .replace(/\[Страница\s+\d+\]/gi, "")
-        .trim();
-}
-
-
-function normalizeMoneyExpression(value) {
-
-    return String(value || "")
-        .replace(/\s+/g, " ")
-        .replace(
-            /\bруб(?:лей|ля|ль)?\.?\b/gi,
-            "₽"
-        )
-        .replace(/\s*р\.\s*$/i, " ₽")
-        .replace(/\s+/g, " ")
-        .trim();
-}
-
-
-function formatNumber(value) {
-
-    return Number(value || 0)
-        .toLocaleString("ru-RU");
-}
-
-
-function formatFileSize(bytes) {
-
-    if (!bytes) {
-        return "0 Б";
+        }, 120);
     }
 
 
-    if (bytes < 1024) {
-        return `${bytes} Б`;
-    }
+    // ============================================================
+    // PLURALIZE
+    // ============================================================
+
+    function pluralize(
+        number,
+        one,
+        few,
+        many
+    ) {
+
+        const n =
+            Math.abs(number) % 100;
 
 
-    if (bytes < 1024 * 1024) {
-
-        return `${(
-            bytes / 1024
-        ).toFixed(1)} КБ`;
-    }
+        const last =
+            n % 10;
 
 
-    return `${(
-        bytes / (1024 * 1024)
-    ).toFixed(1)} МБ`;
-}
+        if (
+            n >= 11 &&
+            n <= 19
+        ) {
+            return many;
+        }
 
 
-function plural(
-    number,
-    one,
-    few,
-    many
-) {
-
-    const n =
-        Math.abs(Number(number)) % 100;
-
-    const n1 =
-        n % 10;
+        if (last === 1) {
+            return one;
+        }
 
 
-    if (n > 10 && n < 20) {
+        if (
+            last >= 2 &&
+            last <= 4
+        ) {
+            return few;
+        }
+
+
         return many;
     }
 
 
-    if (n1 > 1 && n1 < 5) {
-        return few;
+    // ============================================================
+    // HTML ESCAPE
+    // ============================================================
+
+    function escapeHtml(
+        value
+    ) {
+
+        return String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
 
 
-    if (n1 === 1) {
-        return one;
-    }
-
-
-    return many;
-}
-
-
-function escapeHtml(value) {
-
-    return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
-
-
-function sleep(ms) {
-
-    return new Promise(
-        resolve =>
-            setTimeout(
-                resolve,
-                ms
-            )
-    );
-}
+})();
