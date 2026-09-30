@@ -3,228 +3,708 @@
 // APP.JS
 // ======================================================
 
-
-// ------------------------------------------------------
-// ЭЛЕМЕНТЫ
-// ------------------------------------------------------
-
-const uploadCard = document.getElementById("uploadCard");
-const uploadButton = document.getElementById("uploadButton");
-const fileInput = document.getElementById("fileInput");
-
-const aboutButton = document.getElementById("aboutButton");
-const aboutModal = document.getElementById("aboutModal");
-const modalClose = document.getElementById("modalClose");
-const modalOverlay = document.getElementById("modalOverlay");
-
-
-// ------------------------------------------------------
-// НАСТРОЙКИ
-// ------------------------------------------------------
+const SUPABASE_FUNCTION_URL =
+    "https://dazniyfntumbljkocjoo.supabase.co/functions/v1/swift-service";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
-const allowedTypes = [
+const ALLOWED_TYPES = [
     "application/pdf",
     "image/jpeg",
     "image/png"
 ];
 
+const uploadCard = document.getElementById("uploadCard");
+const uploadButton = document.getElementById("uploadButton");
+const fileInput = document.getElementById("fileInput");
+const howItWorksButton = document.getElementById("howItWorksButton");
+const modal = document.getElementById("howItWorksModal");
+const modalClose = document.getElementById("modalClose");
 
-// ------------------------------------------------------
-// ВЫБОР ФАЙЛА
-// ------------------------------------------------------
 
-uploadButton.addEventListener("click", function () {
-    fileInput.click();
+// ======================================================
+// PDF.JS
+// ======================================================
+
+let pdfJsLoaded = false;
+
+function loadPdfJs() {
+    return new Promise((resolve, reject) => {
+
+        if (pdfJsLoaded && window.pdfjsLib) {
+            resolve();
+            return;
+        }
+
+        const script = document.createElement("script");
+
+        script.src =
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs";
+
+        script.type = "module";
+
+        script.onload = () => {
+            setTimeout(() => {
+
+                if (window.pdfjsLib) {
+                    pdfJsLoaded = true;
+                    resolve();
+                } else {
+                    reject(
+                        new Error("PDF.js не загрузился")
+                    );
+                }
+
+            }, 500);
+        };
+
+        script.onerror = () => {
+            reject(
+                new Error("Не удалось загрузить PDF.js")
+            );
+        };
+
+        document.head.appendChild(script);
+    });
+}
+
+
+// ======================================================
+// ИНИЦИАЛИЗАЦИЯ
+// ======================================================
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    setupUploadEvents();
+    setupModal();
+
 });
 
 
-fileInput.addEventListener("change", function () {
+// ======================================================
+// UPLOAD
+// ======================================================
 
-    if (!fileInput.files || fileInput.files.length === 0) {
+function setupUploadEvents() {
+
+    if (!uploadCard || !fileInput) {
+        console.error("Элементы загрузки не найдены");
         return;
     }
 
-    handleFile(fileInput.files[0]);
+    if (uploadButton) {
 
-});
+        uploadButton.addEventListener("click", (event) => {
 
+            event.preventDefault();
 
-// ------------------------------------------------------
-// DRAG & DROP
-// ------------------------------------------------------
+            fileInput.click();
 
-uploadCard.addEventListener("dragover", function (event) {
+        });
 
-    event.preventDefault();
-
-    uploadCard.classList.add("dragover");
-
-});
-
-
-uploadCard.addEventListener("dragleave", function () {
-
-    uploadCard.classList.remove("dragover");
-
-});
-
-
-uploadCard.addEventListener("drop", function (event) {
-
-    event.preventDefault();
-
-    uploadCard.classList.remove("dragover");
-
-    const files = event.dataTransfer.files;
-
-    if (!files || files.length === 0) {
-        return;
     }
 
-    handleFile(files[0]);
+    fileInput.addEventListener("change", () => {
 
-});
+        const file = fileInput.files?.[0];
+
+        if (!file) {
+            return;
+        }
+
+        handleFile(file);
+
+    });
 
 
-// ------------------------------------------------------
-// ОБРАБОТКА ФАЙЛА
-// ------------------------------------------------------
+    // Drag & Drop
+
+    uploadCard.addEventListener("dragover", (event) => {
+
+        event.preventDefault();
+
+        uploadCard.classList.add("dragover");
+
+    });
+
+    uploadCard.addEventListener("dragleave", () => {
+
+        uploadCard.classList.remove("dragover");
+
+    });
+
+    uploadCard.addEventListener("drop", (event) => {
+
+        event.preventDefault();
+
+        uploadCard.classList.remove("dragover");
+
+        const file = event.dataTransfer.files?.[0];
+
+        if (!file) {
+            return;
+        }
+
+        handleFile(file);
+
+    });
+
+}
+
+
+// ======================================================
+// FILE VALIDATION
+// ======================================================
 
 function handleFile(file) {
 
-    if (!allowedTypes.includes(file.type)) {
+    if (!ALLOWED_TYPES.includes(file.type)) {
 
         showError(
-            "Этот формат пока не поддерживается.",
-            "Используйте PDF, JPG или PNG."
+            "Неподдерживаемый формат",
+            "Загрузите PDF, JPG или PNG."
         );
 
         return;
     }
-
 
     if (file.size > MAX_FILE_SIZE) {
 
         showError(
-            "Файл слишком большой.",
-            "Максимальный размер — 20 МБ."
+            "Файл слишком большой",
+            "Максимальный размер документа — 20 МБ."
         );
 
         return;
     }
 
-
     showSelectedFile(file);
-
 }
 
 
-// ------------------------------------------------------
-// ПОКАЗ ВЫБРАННОГО ФАЙЛА
-// ------------------------------------------------------
+// ======================================================
+// SELECTED FILE
+// ======================================================
 
 function showSelectedFile(file) {
 
-    const size = formatFileSize(file.size);
-
     uploadCard.innerHTML = `
-    
-        <div class="upload-icon success-icon">
-            ✓
+        <div class="upload-success">
+            <div class="success-icon">✓</div>
+
+            <h3>Документ загружен</h3>
+
+            <div class="selected-file-name">
+                ${escapeHtml(file.name)}
+            </div>
+
+            <div class="selected-file-size">
+                ${formatFileSize(file.size)}
+            </div>
+
+            <button
+                class="primary-button analyze-button"
+                id="analyzeButton"
+                type="button"
+            >
+                Анализировать документ
+            </button>
+
+            <button
+                class="change-file-button"
+                id="changeFileButton"
+                type="button"
+            >
+                Выбрать другой файл
+            </button>
+
+            <div class="upload-note">
+                Документ обрабатывается безопасно
+            </div>
         </div>
-
-        <h2>Документ загружен</h2>
-
-        <p class="selected-file-name">
-            ${escapeHtml(file.name)}
-        </p>
-
-        <div class="selected-file-size">
-            ${size}
-        </div>
-
-        <button
-            class="upload-button analyze-button"
-            id="analyzeButton"
-            type="button"
-        >
-            Анализировать документ
-        </button>
-
-        <button
-            class="change-file-button"
-            id="changeFileButton"
-            type="button"
-        >
-            Выбрать другой файл
-        </button>
-
-        <div class="upload-note">
-            Анализ пока находится в разработке
-        </div>
-
     `;
 
 
-    const analyzeButton = document.getElementById("analyzeButton");
-    const changeFileButton = document.getElementById("changeFileButton");
+    const analyzeButton =
+        document.getElementById("analyzeButton");
+
+    const changeFileButton =
+        document.getElementById("changeFileButton");
 
 
-    analyzeButton.addEventListener("click", function () {
+    if (analyzeButton) {
 
-        showComingSoon();
+        analyzeButton.addEventListener(
+            "click",
+            () => analyzeDocument(file)
+        );
 
-    });
+    }
 
 
-    changeFileButton.addEventListener("click", function () {
+    if (changeFileButton) {
 
-        resetUpload();
+        changeFileButton.addEventListener(
+            "click",
+            () => {
 
+                fileInput.value = "";
+
+                resetUpload();
+
+            }
+        );
+
+    }
+
+}
+
+
+// ======================================================
+// ANALYZE DOCUMENT
+// ======================================================
+
+async function analyzeDocument(file) {
+
+    const analyzeButton =
+        document.getElementById("analyzeButton");
+
+    if (analyzeButton) {
+
+        analyzeButton.disabled = true;
+
+        analyzeButton.textContent =
+            "Подготавливаем документ…";
+
+    }
+
+
+    try {
+
+        let text = "";
+
+
+        // --------------------------------------------------
+        // PDF
+        // --------------------------------------------------
+
+        if (file.type === "application/pdf") {
+
+            text = await extractPdfText(file);
+
+        }
+
+
+        // --------------------------------------------------
+        // IMAGE
+        // --------------------------------------------------
+
+        else if (
+            file.type === "image/jpeg" ||
+            file.type === "image/png"
+        ) {
+
+            throw new Error(
+                "Анализ изображений пока не подключён. Сначала загрузите текстовый PDF."
+            );
+
+        }
+
+
+        if (!text || text.trim().length < 20) {
+
+            throw new Error(
+                "Не удалось найти текст в документе. Возможно, это скан или фотография."
+            );
+
+        }
+
+
+        if (analyzeButton) {
+
+            analyzeButton.textContent =
+                "AI анализирует документ…";
+
+        }
+
+
+        const result =
+            await sendTextToSupabase(text);
+
+
+        renderAnalysis(result);
+
+
+    } catch (error) {
+
+        console.error(error);
+
+        showError(
+            "Не удалось проанализировать документ",
+            error.message ||
+            "Попробуйте ещё раз."
+        );
+
+    }
+
+}
+
+
+// ======================================================
+// EXTRACT TEXT FROM PDF
+// ======================================================
+
+async function extractPdfText(file) {
+
+    /*
+     * Загружаем PDF.js.
+     */
+
+    await loadPdfJs();
+
+
+    if (!window.pdfjsLib) {
+
+        throw new Error(
+            "Не удалось загрузить PDF-анализатор."
+        );
+
+    }
+
+
+    const arrayBuffer =
+        await file.arrayBuffer();
+
+
+    const pdf =
+        await window.pdfjsLib.getDocument({
+            data: arrayBuffer
+        }).promise;
+
+
+    let fullText = "";
+
+
+    for (
+        let pageNumber = 1;
+        pageNumber <= pdf.numPages;
+        pageNumber++
+    ) {
+
+        const page =
+            await pdf.getPage(pageNumber);
+
+
+        const content =
+            await page.getTextContent();
+
+
+        const pageText =
+            content.items
+                .map(item => item.str || "")
+                .join(" ");
+
+
+        fullText +=
+            `\n\n--- Страница ${pageNumber} ---\n\n` +
+            pageText;
+
+
+        /*
+         * Защита от слишком огромного документа.
+         */
+
+        if (fullText.length > 250000) {
+
+            fullText =
+                fullText.substring(0, 250000);
+
+            break;
+
+        }
+
+    }
+
+
+    return fullText.trim();
+
+}
+
+
+// ======================================================
+// SEND TO SUPABASE
+// ======================================================
+
+async function sendTextToSupabase(text) {
+
+    const response =
+        await fetch(
+            SUPABASE_FUNCTION_URL,
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
+
+                body: JSON.stringify({
+                    text: text
+                })
+            }
+        );
+
+
+    let data;
+
+    try {
+
+        data = await response.json();
+
+    } catch {
+
+        throw new Error(
+            "Сервер вернул некорректный ответ."
+        );
+
+    }
+
+
+    if (!response.ok) {
+
+        throw new Error(
+            data?.error ||
+            "Ошибка анализа документа."
+        );
+
+    }
+
+
+    return data;
+
+}
+
+
+// ======================================================
+// RENDER RESULT
+// ======================================================
+
+function renderAnalysis(result) {
+
+    uploadCard.innerHTML = `
+        <div class="analysis-result">
+
+            <div class="result-header">
+
+                <div class="result-badge">
+                    РЕЗУЛЬТАТ АНАЛИЗА
+                </div>
+
+                <h2>
+                    Документ разобран
+                </h2>
+
+                <p class="result-summary">
+                    ${escapeHtml(result.summary)}
+                </p>
+
+            </div>
+
+
+            ${
+                result.duration
+                    ? `
+                        <div class="result-duration">
+                            <strong>Срок действия:</strong>
+                            ${escapeHtml(result.duration)}
+                        </div>
+                    `
+                    : ""
+            }
+
+
+            ${renderFindings(
+                result.important,
+                "🔴 Важное",
+                "result-section important"
+            )}
+
+
+            ${renderFindings(
+                result.worthKnowing,
+                "🟡 Стоит знать",
+                "result-section worth-knowing"
+            )}
+
+
+            ${renderFindings(
+                result.payments,
+                "💰 Деньги",
+                "result-section payments"
+            )}
+
+
+            ${renderFindings(
+                result.clear,
+                "🟢 Без особенностей",
+                "result-section clear"
+            )}
+
+
+            <div class="result-disclaimer">
+                ${escapeHtml(result.disclaimer)}
+            </div>
+
+
+            <button
+                class="primary-button"
+                id="newDocumentButton"
+                type="button"
+            >
+                Проверить другой документ
+            </button>
+
+        </div>
+    `;
+
+
+    const newDocumentButton =
+        document.getElementById(
+            "newDocumentButton"
+        );
+
+
+    if (newDocumentButton) {
+
+        newDocumentButton.addEventListener(
+            "click",
+            () => {
+
+                fileInput.value = "";
+
+                resetUpload();
+
+            }
+        );
+
+    }
+
+
+    uploadCard.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
     });
 
 }
 
 
-// ------------------------------------------------------
-// СБРОС
-// ------------------------------------------------------
+// ======================================================
+// FINDINGS
+// ======================================================
+
+function renderFindings(
+    findings,
+    title,
+    className
+) {
+
+    if (
+        !Array.isArray(findings) ||
+        findings.length === 0
+    ) {
+
+        return "";
+
+    }
+
+
+    return `
+        <section class="${className}">
+
+            <h3>
+                ${title}
+            </h3>
+
+            <div class="findings-list">
+
+                ${findings.map(
+                    finding => `
+                        <article class="finding-card">
+
+                            <div class="finding-top">
+
+                                <strong>
+                                    ${escapeHtml(
+                                        finding.title
+                                    )}
+                                </strong>
+
+                                <span class="severity-dot severity-${escapeHtml(
+                                    finding.severity
+                                )}"></span>
+
+                            </div>
+
+                            <p>
+                                ${escapeHtml(
+                                    finding.explanation
+                                )}
+                            </p>
+
+                            ${
+                                finding.source
+                                    ? `
+                                        <div class="finding-source">
+                                            ${escapeHtml(
+                                                finding.source
+                                            )}
+                                        </div>
+                                    `
+                                    : ""
+                            }
+
+                        </article>
+                    `
+                ).join("")}
+
+            </div>
+
+        </section>
+    `;
+
+}
+
+
+// ======================================================
+// RESET
+// ======================================================
 
 function resetUpload() {
 
     uploadCard.innerHTML = `
-
         <div class="upload-icon">
             ↑
         </div>
 
-        <h2>Загрузите документ</h2>
+        <h3>
+            Загрузите документ
+        </h3>
 
         <p>
             PDF, JPG или PNG
         </p>
 
         <button
-            class="upload-button"
+            class="primary-button"
             id="uploadButton"
             type="button"
         >
             Выбрать файл
         </button>
 
-        <input
-            type="file"
-            id="fileInput"
-            accept=".pdf,.jpg,.jpeg,.png"
-            hidden
-        >
-
         <div class="upload-note">
             Документ анализируется автоматически
         </div>
-
     `;
 
 
@@ -233,202 +713,260 @@ function resetUpload() {
 }
 
 
-// ------------------------------------------------------
-// ПОВТОРНОЕ ПОДКЛЮЧЕНИЕ СОБЫТИЙ
-// ------------------------------------------------------
+// ======================================================
+// RECONNECT EVENTS
+// ======================================================
 
 function reconnectUploadEvents() {
 
     const newUploadButton =
         document.getElementById("uploadButton");
 
-    const newFileInput =
-        document.getElementById("fileInput");
+
+    if (newUploadButton) {
+
+        newUploadButton.addEventListener(
+            "click",
+            (event) => {
+
+                event.preventDefault();
+
+                fileInput.click();
+
+            }
+        );
+
+    }
 
 
-    newUploadButton.addEventListener("click", function () {
+    uploadCard.addEventListener(
+        "dragover",
+        (event) => {
 
-        newFileInput.click();
+            event.preventDefault();
 
-    });
+            uploadCard.classList.add(
+                "dragover"
+            );
 
-
-    newFileInput.addEventListener("change", function () {
-
-        if (!newFileInput.files || newFileInput.files.length === 0) {
-            return;
         }
+    );
 
-        handleFile(newFileInput.files[0]);
 
-    });
+    uploadCard.addEventListener(
+        "dragleave",
+        () => {
+
+            uploadCard.classList.remove(
+                "dragover"
+            );
+
+        }
+    );
+
+
+    uploadCard.addEventListener(
+        "drop",
+        (event) => {
+
+            event.preventDefault();
+
+            uploadCard.classList.remove(
+                "dragover"
+            );
+
+            const file =
+                event.dataTransfer.files?.[0];
+
+            if (file) {
+
+                handleFile(file);
+
+            }
+
+        }
+    );
 
 }
 
 
-// ------------------------------------------------------
-// ОШИБКА
-// ------------------------------------------------------
+// ======================================================
+// ERROR
+// ======================================================
 
-function showError(title, text) {
+function showError(
+    title,
+    message
+) {
 
     uploadCard.innerHTML = `
+        <div class="upload-error">
 
-        <div class="upload-icon error-icon">
-            !
+            <div class="error-icon">
+                !
+            </div>
+
+            <h3>
+                ${escapeHtml(title)}
+            </h3>
+
+            <p>
+                ${escapeHtml(message)}
+            </p>
+
+            <button
+                class="primary-button"
+                id="errorBackButton"
+                type="button"
+            >
+                Попробовать снова
+            </button>
+
         </div>
-
-        <h2>${escapeHtml(title)}</h2>
-
-        <p>
-            ${escapeHtml(text)}
-        </p>
-
-        <button
-            class="upload-button"
-            id="errorBackButton"
-            type="button"
-        >
-            Попробовать снова
-        </button>
-
     `;
 
 
-    document
-        .getElementById("errorBackButton")
-        .addEventListener("click", function () {
-
-            resetUpload();
-
-        });
-
-}
+    const errorBackButton =
+        document.getElementById(
+            "errorBackButton"
+        );
 
 
-// ------------------------------------------------------
-// ЗАГЛУШКА АНАЛИЗА
-// ------------------------------------------------------
+    if (errorBackButton) {
 
-function showComingSoon() {
+        errorBackButton.addEventListener(
+            "click",
+            () => {
 
-    uploadCard.innerHTML = `
+                fileInput.value = "";
 
-        <div class="upload-icon">
-            ...
-        </div>
+                resetUpload();
 
-        <h2>
-            Готовим анализ
-        </h2>
+            }
+        );
 
-        <p>
-            Следующим шагом подключим настоящий
-            анализ текста документа.
-        </p>
-
-        <button
-            class="upload-button"
-            id="backFromAnalysis"
-            type="button"
-        >
-            Вернуться
-        </button>
-
-    `;
-
-
-    document
-        .getElementById("backFromAnalysis")
-        .addEventListener("click", function () {
-
-            resetUpload();
-
-        });
+    }
 
 }
 
 
-// ------------------------------------------------------
-// РАЗМЕР ФАЙЛА
-// ------------------------------------------------------
+// ======================================================
+// MODAL
+// ======================================================
+
+function setupModal() {
+
+    if (
+        !howItWorksButton ||
+        !modal
+    ) {
+        return;
+    }
+
+
+    howItWorksButton.addEventListener(
+        "click",
+        () => {
+
+            modal.classList.add(
+                "active"
+            );
+
+        }
+    );
+
+
+    if (modalClose) {
+
+        modalClose.addEventListener(
+            "click",
+            () => {
+
+                modal.classList.remove(
+                    "active"
+                );
+
+            }
+        );
+
+    }
+
+
+    modal.addEventListener(
+        "click",
+        (event) => {
+
+            if (
+                event.target === modal
+            ) {
+
+                modal.classList.remove(
+                    "active"
+                );
+
+            }
+
+        }
+    );
+
+
+    document.addEventListener(
+        "keydown",
+        (event) => {
+
+            if (
+                event.key === "Escape"
+            ) {
+
+                modal.classList.remove(
+                    "active"
+                );
+
+            }
+
+        }
+    );
+
+}
+
+
+// ======================================================
+// HELPERS
+// ======================================================
 
 function formatFileSize(bytes) {
 
     if (bytes < 1024) {
-        return bytes + " Б";
+
+        return `${bytes} Б`;
+
     }
 
 
     if (bytes < 1024 * 1024) {
-        return (bytes / 1024).toFixed(1) + " КБ";
+
+        return `${(
+            bytes / 1024
+        ).toFixed(1)} КБ`;
+
     }
 
 
-    return (bytes / (1024 * 1024)).toFixed(1) + " МБ";
+    return `${(
+        bytes /
+        (1024 * 1024)
+    ).toFixed(1)} МБ`;
 
 }
 
 
-// ------------------------------------------------------
-// БЕЗОПАСНЫЙ ВЫВОД ТЕКСТА
-// ------------------------------------------------------
+function escapeHtml(value) {
 
-function escapeHtml(text) {
-
-    const div = document.createElement("div");
-
-    div.textContent = text;
-
-    return div.innerHTML;
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
 
 }
-
-
-// ------------------------------------------------------
-// МОДАЛЬНОЕ ОКНО
-// ------------------------------------------------------
-
-aboutButton.addEventListener("click", function () {
-
-    aboutModal.classList.add("active");
-
-});
-
-
-modalClose.addEventListener("click", function () {
-
-    aboutModal.classList.remove("active");
-
-});
-
-
-modalOverlay.addEventListener("click", function () {
-
-    aboutModal.classList.remove("active");
-
-});
-
-
-// ------------------------------------------------------
-// ESC
-// ------------------------------------------------------
-
-document.addEventListener("keydown", function (event) {
-
-    if (event.key === "Escape") {
-
-        aboutModal.classList.remove("active");
-
-    }
-
-});
-
-
-// ------------------------------------------------------
-// ГОТОВО
-// ------------------------------------------------------
-
-console.log(
-    "Что я подписываю? — приложение загружено."
-);
