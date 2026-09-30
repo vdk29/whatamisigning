@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Что я подписываю?</title>
+    <meta name="description" content="Загрузите договор или документ и разберитесь в важных условиях простыми словами.">
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <main class="page">
+
+        <header class="header">
+            <div class="logo">
+                <span class="logo-mark">W</span>
+                <span>Что я подписываю?</span>
+            </div>
+
+            <button class="about-button" id="aboutButton">
+                Как это работает
+            </button>
+        </header>
+
+
+        <section class="hero">
+
+            <div class="hero-badge">
+                ПРОВЕРКА ДОКУМЕНТОВ
+            </div>
+
+            <h1>
+                Перед тем как<br>
+                <span>подписать</span> — прочитай.
+            </h1>
+
+            <p class="hero-text">
+                Загрузите договор, оферту или другой документ.
+                Мы поможем разобраться в сложных условиях
+                простыми словами.
+            </p>
+
+
+            <div class="upload-card" id="uploadCard">
+
+                <div class="upload-icon">
+                    ↑
+                </div>
+
+                <h2>Загрузите документ</h2>
+
+                <p>
+                    PDF, JPG или PNG
+                </p>
+
+                <button class="upload-button" id="uploadButton">
+                    Выбрать файл
+                </button>
+
+                <input
+                    type="file"
+                    id="fileInput"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    hidden
+                >
+
+                <div class="upload-note">
+                    Документ анализируется автоматически
+                </div>
+
+            </div>
+
+
+            <div class="trust-block">
+
+                <div class="trust-item">
+                    <span>01</span>
+                    <div>
+                        <strong>Загрузите</strong>
+                        <p>договор или документ</p>
+                    </div>
+                </div>
+
+                <div class="trust-line"></div>
+
+                <div class="trust-item">
+                    <span>02</span>
+                    <div>
+                        <strong>Получите</strong>
+                        <p>понятное объяснение</p>
+                    </div>
+                </div>
+
+                <div class="trust-line"></div>
+
+                <div class="trust-item">
+                    <span>03</span>
+                    <div>
+                        <strong>Обратите внимание</strong>
+                        <p>на важные условия</p>
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <section class="features">
+
+            <div class="section-label">
+                ЧТО МЫ ИЩЕМ
+            </div>
+
+            <h2>
+                Никакого юридического<br>
+                языка.
+            </h2>
+
+            <div class="feature-grid">
+
+                <article class="feature-card danger">
+                    <div class="feature-number">01</div>
+                    <div class="feature-icon">!</div>
+
+                    <h3>Важные условия</h3>
+
+                    <p>
+                        Найдём пункты, которые могут
+                        существенно повлиять на вас.
+                    </p>
+                </article>
+
+
+                <article class="feature-card warning">
+                    <div class="feature-number">02</div>
+                    <div class="feature-icon">↻</div>
+
+                    <h3>Автопродление</h3>
+
+                    <p>
+                        Обратим внимание на продление,
+                        сроки уведомления и отмену.
+                    </p>
+                </article>
+
+
+                <article class="feature-card neutral">
+                    <div class="feature-number">03</div>
+                    <div class="feature-icon">₽</div>
+
+                    <h3>Деньги и штрафы</h3>
+
+                    <p>
+                        Покажем платежи, комиссии,
+                        штрафы и возможные расходы.
+                    </p>
+                </article>
+
+
+                <article class="feature-card neutral">
+                    <div class="feature-number">04</div>
+                    <div class="feature-icon">i</div>
+
+                    <h3>Простое объяснение</h3>
+
+                    <p>
+                        Переведём сложные формулировки
+                        на нормальный человеческий язык.
+                    </p>
+                </article>
+
+            </div>
+
+        </section>
+
+
+        <section class="example-section">
+
+            <div class="example-header">
+                <div class="section-label">
+                    КАК ЭТО БУДЕТ ВЫГЛЯДЕТЬ
+                </div>
+
+                <h2>
+                    Паспорт документа.
+                </h2>
+            </div>
+
+
+            <div class="document-preview">
+
+                <div class="document-top">
+                    <div>
+                        <span class="document-label">
+                            ДОГОВОР №4821
+                        </span>
+
+                        <h3>
+                            Договор оказания услуг
+                        </h3>
+                    </div>
+
+                    <div class="document-status">
+                        7 пунктов
+                    </div>
+                </div>
+
+
+                <div class="risk-item red">
+
+                    <div class="risk-icon">
+                        !
+                    </div>
+
+                    <div class="risk-content">
+
+                        <span class="risk-label">
+                            ВАЖНО
+                        </span>
+
+                        <h4>
+                            Автоматическое продление
+                        </h4>
+
+                        <p>
+                            Договор продлевается автоматически,
+                            если не уведомить компанию заранее.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="risk-item yellow">
+
+                    <div class="risk-icon">
+                        ↻
+                    </div>
+
+                    <div class="risk-content">
+
+                        <span class="risk-label">
+                            СТОИТ ЗНАТЬ
+                        </span>
+
+                        <h4>
+                            Изменение стоимости
+                        </h4>
+
+                        <p>
+                            В документе есть условие,
+                            позволяющее изменить стоимость услуги.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="risk-item green">
+
+                    <div class="risk-icon">
+                        ✓
+                    </div>
+
+                    <div class="risk-content">
+
+                        <span class="risk-label">
+                            ВСЁ ПОНЯТНО
+                        </span>
+
+                        <h4>
+                            Срок действия
+                        </h4>
+
+                        <p>
+                            Срок действия договора указан
+                            однозначно.
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <footer class="footer">
+
+            <div class="footer-logo">
+                Что я подписываю?
+            </div>
+
+            <p>
+                Помогаем понять документы простыми словами.
+            </p>
+
+            <div class="footer-disclaimer">
+                Информация носит справочный характер и не является
+                юридической консультацией.
+            </div>
+
+            <div class="footer-copy">
+                © 2026 Что я подписываю?
+            </div>
+
+        </footer>
+
+    </main>
+
+
+    <div class="modal" id="aboutModal">
+
+        <div class="modal-overlay" id="modalOverlay"></div>
+
+        <div class="modal-card">
+
+            <button class="modal-close" id="modalClose">
+                ×
+            </button>
+
+            <div class="section-label">
+                КАК ЭТО РАБОТАЕТ
+            </div>
+
+            <h2>
+                Загружаешь.<br>
+                Получаешь ответ.
+            </h2>
+
+            <p>
+                Сервис анализирует текст документа и помогает
+                обратить внимание на важные условия:
+                платежи, сроки, штрафы, автопродление,
+                ограничения и другие пункты.
+            </p>
+
+            <p>
+                Мы не заменяем юриста и не определяем,
+                является ли договор законным.
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <script src="app.js"></script>
+
+</body>
+</html>
