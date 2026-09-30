@@ -6,6 +6,7 @@
 // ======================================================
 
 const PDFJS_VERSION = "3.11.174";
+
 const PDFJS_URL =
     `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.min.js`;
 
@@ -35,11 +36,13 @@ const modalClose = document.getElementById("modalClose");
 // ======================================================
 
 if (uploadButton && fileInput) {
+
     uploadButton.addEventListener("click", () => {
         fileInput.click();
     });
 
     fileInput.addEventListener("change", async (event) => {
+
         const file = event.target.files?.[0];
 
         if (!file) {
@@ -55,16 +58,21 @@ if (uploadButton && fileInput) {
 // ======================================================
 
 if (uploadCard) {
+
     uploadCard.addEventListener("dragover", (event) => {
+
         event.preventDefault();
+
         uploadCard.classList.add("drag-active");
     });
 
     uploadCard.addEventListener("dragleave", () => {
+
         uploadCard.classList.remove("drag-active");
     });
 
     uploadCard.addEventListener("drop", async (event) => {
+
         event.preventDefault();
 
         uploadCard.classList.remove("drag-active");
@@ -84,8 +92,11 @@ if (uploadCard) {
 // ======================================================
 
 if (aboutButton && aboutModal) {
+
     aboutButton.addEventListener("click", () => {
+
         aboutModal.classList.add("active");
+
         document.body.classList.add("modal-open");
     });
 }
@@ -99,17 +110,20 @@ if (modalOverlay) {
 }
 
 document.addEventListener("keydown", (event) => {
+
     if (event.key === "Escape") {
         closeModal();
     }
 });
 
 function closeModal() {
+
     if (!aboutModal) {
         return;
     }
 
     aboutModal.classList.remove("active");
+
     document.body.classList.remove("modal-open");
 }
 
@@ -118,18 +132,25 @@ function closeModal() {
 // ======================================================
 
 async function handleFile(file) {
+
     clearPreviousResult();
 
     const validationError = validateFile(file);
 
     if (validationError) {
-        showStatus(validationError, "error");
+
+        showStatus(
+            validationError,
+            "error"
+        );
+
         return;
     }
 
     showSelectedFile(file);
 
     try {
+
         const type = getFileType(file);
 
         let text = "";
@@ -139,6 +160,7 @@ async function handleFile(file) {
         // --------------------------------------------------
 
         if (type === "pdf") {
+
             showStatus(
                 "Читаем PDF...",
                 "loading"
@@ -146,11 +168,10 @@ async function handleFile(file) {
 
             text = await extractPdfText(file);
 
-            // Если PDF практически пустой —
-            // считаем, что это скан.
             if (!text || text.trim().length < 80) {
+
                 showStatus(
-                    "Текстовый слой не найден. Запускаем распознавание...",
+                    "Текстовый слой не найден. Распознаём документ...",
                     "loading"
                 );
 
@@ -163,6 +184,7 @@ async function handleFile(file) {
         // --------------------------------------------------
 
         if (type === "image") {
+
             showStatus(
                 "Распознаём документ...",
                 "loading"
@@ -174,6 +196,7 @@ async function handleFile(file) {
         text = normalizeText(text);
 
         if (!text || text.length < 20) {
+
             throw new Error(
                 "Не удалось получить читаемый текст из документа."
             );
@@ -184,7 +207,6 @@ async function handleFile(file) {
             "loading"
         );
 
-        // Небольшая пауза, чтобы браузер успел показать статус
         await sleep(150);
 
         const result = analyzeDocument(text);
@@ -192,11 +214,12 @@ async function handleFile(file) {
         renderAnalysisResult(result);
 
         showStatus(
-            `Готово. Найдено важных пунктов: ${result.totalFindings}`,
+            `Готово. Найдено условий: ${result.totalFindings}`,
             "success"
         );
 
     } catch (error) {
+
         console.error(error);
 
         showStatus(
@@ -212,6 +235,7 @@ async function handleFile(file) {
 // ======================================================
 
 function validateFile(file) {
+
     if (!file) {
         return "Файл не выбран.";
     }
@@ -236,6 +260,7 @@ function validateFile(file) {
 }
 
 function getFileType(file) {
+
     const name = file.name.toLowerCase();
 
     if (name.endsWith(".pdf")) {
@@ -250,39 +275,52 @@ function getFileType(file) {
 // ======================================================
 
 async function loadPdfJs() {
+
     if (window.pdfjsLib) {
         return window.pdfjsLib;
     }
 
     return new Promise((resolve, reject) => {
-        const existing = document.querySelector(
-            'script[data-pdfjs="true"]'
-        );
+
+        const existing =
+            document.querySelector(
+                'script[data-pdfjs="true"]'
+            );
 
         if (existing) {
+
             existing.addEventListener("load", () => {
                 resolve(window.pdfjsLib);
             });
 
             existing.addEventListener("error", () => {
                 reject(
-                    new Error("Не удалось загрузить модуль чтения PDF.")
+                    new Error(
+                        "Не удалось загрузить модуль чтения PDF."
+                    )
                 );
             });
 
             return;
         }
 
-        const script = document.createElement("script");
+        const script =
+            document.createElement("script");
 
         script.src = PDFJS_URL;
+
         script.dataset.pdfjs = "true";
 
         script.onload = () => {
+
             if (!window.pdfjsLib) {
+
                 reject(
-                    new Error("PDF.js загрузился некорректно.")
+                    new Error(
+                        "PDF.js загрузился некорректно."
+                    )
                 );
+
                 return;
             }
 
@@ -290,6 +328,7 @@ async function loadPdfJs() {
         };
 
         script.onerror = () => {
+
             reject(
                 new Error(
                     "Не удалось загрузить модуль чтения PDF. Проверьте интернет-соединение."
@@ -302,36 +341,47 @@ async function loadPdfJs() {
 }
 
 // ======================================================
-// ИЗВЛЕЧЕНИЕ ТЕКСТА ИЗ ОБЫЧНОГО PDF
+// ИЗВЛЕЧЕНИЕ ТЕКСТА ИЗ PDF
 // ======================================================
 
 async function extractPdfText(file) {
+
     const pdfjsLib = await loadPdfJs();
 
     pdfjsLib.GlobalWorkerOptions.workerSrc =
         PDFJS_WORKER_URL;
 
-    const arrayBuffer = await file.arrayBuffer();
+    const arrayBuffer =
+        await file.arrayBuffer();
 
-    const pdf = await pdfjsLib.getDocument({
-        data: arrayBuffer
-    }).promise;
+    const pdf =
+        await pdfjsLib.getDocument({
+            data: arrayBuffer
+        }).promise;
 
     let fullText = "";
 
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+    for (
+        let pageNumber = 1;
+        pageNumber <= pdf.numPages;
+        pageNumber++
+    ) {
+
         showStatus(
             `Читаем страницу ${pageNumber} из ${pdf.numPages}...`,
             "loading"
         );
 
-        const page = await pdf.getPage(pageNumber);
+        const page =
+            await pdf.getPage(pageNumber);
 
-        const textContent = await page.getTextContent();
+        const textContent =
+            await page.getTextContent();
 
-        const pageText = textContent.items
-            .map(item => item.str || "")
-            .join(" ");
+        const pageText =
+            textContent.items
+                .map(item => item.str || "")
+                .join(" ");
 
         fullText += "\n" + pageText;
     }
@@ -340,20 +390,24 @@ async function extractPdfText(file) {
 }
 
 // ======================================================
-// TESSERACT.JS
+// TESSERACT
 // ======================================================
 
 async function loadTesseract() {
+
     if (window.Tesseract) {
         return window.Tesseract;
     }
 
     return new Promise((resolve, reject) => {
-        const existing = document.querySelector(
-            'script[data-tesseract="true"]'
-        );
+
+        const existing =
+            document.querySelector(
+                'script[data-tesseract="true"]'
+            );
 
         if (existing) {
+
             existing.addEventListener("load", () => {
                 resolve(window.Tesseract);
             });
@@ -369,18 +423,23 @@ async function loadTesseract() {
             return;
         }
 
-        const script = document.createElement("script");
+        const script =
+            document.createElement("script");
 
         script.src = TESSERACT_URL;
+
         script.dataset.tesseract = "true";
 
         script.onload = () => {
+
             if (!window.Tesseract) {
+
                 reject(
                     new Error(
                         "OCR-модуль загрузился некорректно."
                     )
                 );
+
                 return;
             }
 
@@ -388,6 +447,7 @@ async function loadTesseract() {
         };
 
         script.onerror = () => {
+
             reject(
                 new Error(
                     "Не удалось загрузить OCR. Проверьте интернет-соединение."
@@ -404,90 +464,119 @@ async function loadTesseract() {
 // ======================================================
 
 async function ocrImage(file) {
-    const Tesseract = await loadTesseract();
+
+    const Tesseract =
+        await loadTesseract();
 
     showStatus(
         "Запускаем распознавание русского текста...",
         "loading"
     );
 
-    const worker = await Tesseract.createWorker("rus", 1, {
-        logger: (message) => {
-            handleOcrProgress(message);
-        }
-    });
+    const worker =
+        await Tesseract.createWorker(
+            "rus",
+            1,
+            {
+                logger: (message) => {
+                    handleOcrProgress(message);
+                }
+            }
+        );
 
     try {
-        const result = await worker.recognize(file);
+
+        const result =
+            await worker.recognize(file);
 
         return result?.data?.text || "";
+
     } finally {
+
         await worker.terminate();
     }
 }
 
 // ======================================================
-// OCR СКАНИРОВАННОГО PDF
+// OCR PDF
 // ======================================================
 
 async function ocrPdf(file) {
-    const pdfjsLib = await loadPdfJs();
-    const Tesseract = await loadTesseract();
+
+    const pdfjsLib =
+        await loadPdfJs();
+
+    const Tesseract =
+        await loadTesseract();
 
     pdfjsLib.GlobalWorkerOptions.workerSrc =
         PDFJS_WORKER_URL;
 
-    const arrayBuffer = await file.arrayBuffer();
+    const arrayBuffer =
+        await file.arrayBuffer();
 
-    const pdf = await pdfjsLib.getDocument({
-        data: arrayBuffer
-    }).promise;
+    const pdf =
+        await pdfjsLib.getDocument({
+            data: arrayBuffer
+        }).promise;
 
-    const worker = await Tesseract.createWorker("rus", 1, {
-        logger: (message) => {
-            handleOcrProgress(message);
-        }
-    });
+    const worker =
+        await Tesseract.createWorker(
+            "rus",
+            1,
+            {
+                logger: (message) => {
+                    handleOcrProgress(message);
+                }
+            }
+        );
 
     let fullText = "";
 
     try {
+
         for (
             let pageNumber = 1;
             pageNumber <= pdf.numPages;
             pageNumber++
         ) {
+
             showStatus(
                 `Распознаём страницу ${pageNumber} из ${pdf.numPages}...`,
                 "loading"
             );
 
-            const page = await pdf.getPage(pageNumber);
+            const page =
+                await pdf.getPage(pageNumber);
 
-            // Масштаб OCR.
-            // 1.5 даёт хороший баланс между качеством
-            // и скоростью на телефоне.
             const scale = 1.5;
 
-            const viewport = page.getViewport({
-                scale
-            });
+            const viewport =
+                page.getViewport({
+                    scale
+                });
 
-            const canvas = document.createElement("canvas");
+            const canvas =
+                document.createElement("canvas");
 
-            const context = canvas.getContext("2d", {
-                alpha: false
-            });
+            const context =
+                canvas.getContext("2d", {
+                    alpha: false
+                });
 
-            canvas.width = Math.ceil(viewport.width);
-            canvas.height = Math.ceil(viewport.height);
+            canvas.width =
+                Math.ceil(viewport.width);
+
+            canvas.height =
+                Math.ceil(viewport.height);
 
             await page.render({
                 canvasContext: context,
                 viewport
             }).promise;
 
-            const result = await worker.recognize(canvas);
+            const result =
+                await worker.recognize(canvas);
 
             const pageText =
                 result?.data?.text || "";
@@ -497,11 +586,12 @@ async function ocrPdf(file) {
                 `СТРАНИЦА ${pageNumber}\n` +
                 pageText;
 
-            // Освобождаем память телефона
             canvas.width = 1;
             canvas.height = 1;
         }
+
     } finally {
+
         await worker.terminate();
     }
 
@@ -509,10 +599,11 @@ async function ocrPdf(file) {
 }
 
 // ======================================================
-// OCR ПРОГРЕСС
+// OCR PROGRESS
 // ======================================================
 
 function handleOcrProgress(message) {
+
     if (!message) {
         return;
     }
@@ -521,8 +612,11 @@ function handleOcrProgress(message) {
         message.status === "recognizing text" &&
         typeof message.progress === "number"
     ) {
+
         const percent =
-            Math.round(message.progress * 100);
+            Math.round(
+                message.progress * 100
+            );
 
         showStatus(
             `Распознаём текст... ${percent}%`,
@@ -532,10 +626,11 @@ function handleOcrProgress(message) {
 }
 
 // ======================================================
-// НОРМАЛИЗАЦИЯ ТЕКСТА
+// НОРМАЛИЗАЦИЯ
 // ======================================================
 
 function normalizeText(text) {
+
     if (!text) {
         return "";
     }
@@ -553,11 +648,12 @@ function normalizeText(text) {
 // ======================================================
 
 function analyzeDocument(text) {
-    const sentences = splitIntoSentences(text);
+
+    const sentences =
+        splitIntoSentences(text);
 
     const important = [];
     const worthKnowing = [];
-    const clear = [];
 
     // --------------------------------------------------
     // АВТОПРОДЛЕНИЕ
@@ -572,7 +668,8 @@ function analyzeDocument(text) {
             "продлевается автоматически",
             "если ни одна из сторон не заявит",
             "если не уведомит",
-            "считается продленным"
+            "считается продленным",
+            "считается продлённым"
         ],
         important,
         "Автоматическое продление",
@@ -594,8 +691,8 @@ function analyzeDocument(text) {
             "компенсация"
         ],
         important,
-        "Штраф или санкция",
-        "В документе предусмотрена денежная ответственность."
+        "Штрафы и санкции",
+        "В документе предусмотрена денежная ответственность за определённые нарушения."
     );
 
     // --------------------------------------------------
@@ -630,6 +727,7 @@ function analyzeDocument(text) {
             "вправе изменить стоимость",
             "стоимость может быть изменена",
             "тариф может быть изменен",
+            "тариф может быть изменён",
             "тариф может измениться"
         ],
         important,
@@ -670,8 +768,8 @@ function analyzeDocument(text) {
             "дополнительная плата"
         ],
         important,
-        "Дополнительная комиссия",
-        "Помимо основной оплаты может взиматься дополнительная комиссия."
+        "Комиссии и дополнительные платежи",
+        "Помимо основной оплаты может взиматься дополнительная комиссия или плата."
     );
 
     // --------------------------------------------------
@@ -786,84 +884,72 @@ function analyzeDocument(text) {
             "ограничения"
         ],
         worthKnowing,
-        "Ограничение",
+        "Ограничения",
         "В документе есть ограничения или действия, которые запрещены."
     );
+
+    // --------------------------------------------------
+    // ОБЪЕДИНЯЕМ ОДИНАКОВЫЕ КАТЕГОРИИ
+    // --------------------------------------------------
+
+    const groupedImportant =
+        groupFindings(important);
+
+    const groupedWorthKnowing =
+        groupFindings(worthKnowing);
 
     // --------------------------------------------------
     // ДЕНЬГИ
     // --------------------------------------------------
 
-    const moneyMatches = extractMoney(text);
+    const moneyMatches =
+        extractMoney(text);
 
-    if (moneyMatches.length > 0) {
-        clear.push({
-            title: "Денежные суммы",
-            description:
-                "В документе обнаружены конкретные суммы денег.",
-            source:
-                moneyMatches.slice(0, 8).join(", ")
-        });
-    }
+    const percentages =
+        extractPercentages(text);
 
     // --------------------------------------------------
-    // ПРОЦЕНТЫ
+    // СРОКИ
     // --------------------------------------------------
 
-    const percentages = extractPercentages(text);
-
-    if (percentages.length > 0) {
-        important.push({
-            title: "Процентные условия",
-            description:
-                "В документе обнаружены процентные значения, которые могут влиять на оплату или ответственность.",
-            source:
-                percentages.slice(0, 10).join(", ")
-        });
-    }
+    const duration =
+        detectDuration(text);
 
     // --------------------------------------------------
-    // УДАЛЯЕМ ДУБЛИКАТЫ
+    // ИТОГ
     // --------------------------------------------------
-
-    const uniqueImportant =
-        removeDuplicates(important);
-
-    const uniqueWorthKnowing =
-        removeDuplicates(worthKnowing);
-
-    const uniqueClear =
-        removeDuplicates(clear);
 
     const totalFindings =
-        uniqueImportant.length +
-        uniqueWorthKnowing.length;
+        groupedImportant.length +
+        groupedWorthKnowing.length;
 
     return {
-        summary: createSummary(
-            uniqueImportant,
-            uniqueWorthKnowing,
-            uniqueClear
-        ),
 
-        important: uniqueImportant,
+        summary:
+            createSummary(
+                groupedImportant,
+                groupedWorthKnowing
+            ),
 
-        worthKnowing: uniqueWorthKnowing,
+        important:
+            groupedImportant,
 
-        clear: uniqueClear,
+        worthKnowing:
+            groupedWorthKnowing,
 
-        payments: moneyMatches,
+        payments:
+            moneyMatches,
 
         percentages,
 
-        duration: detectDuration(text),
+        duration,
 
         totalFindings
     };
 }
 
 // ======================================================
-// ПОИСК КЛЮЧЕВЫХ ФРАЗ
+// ПОИСК
 // ======================================================
 
 function findMatches(
@@ -873,13 +959,17 @@ function findMatches(
     title,
     description
 ) {
+
     for (const sentence of sentences) {
+
         const lower =
             sentence.toLowerCase();
 
         const matched =
             keywords.some(keyword =>
-                lower.includes(keyword.toLowerCase())
+                lower.includes(
+                    keyword.toLowerCase()
+                )
             );
 
         if (!matched) {
@@ -895,33 +985,86 @@ function findMatches(
 }
 
 // ======================================================
+// ОБЪЕДИНЕНИЕ ОДИНАКОВЫХ НАХОДОК
+// ======================================================
+
+function groupFindings(items) {
+
+    const groups = new Map();
+
+    for (const item of items) {
+
+        const key =
+            item.title.toLowerCase();
+
+        if (!groups.has(key)) {
+
+            groups.set(key, {
+                title: item.title,
+                description: item.description,
+                sources: []
+            });
+        }
+
+        const group =
+            groups.get(key);
+
+        if (
+            item.source &&
+            !group.sources.includes(item.source)
+        ) {
+
+            group.sources.push(
+                item.source
+            );
+        }
+    }
+
+    return Array.from(
+        groups.values()
+    );
+}
+
+// ======================================================
 // ПРЕДЛОЖЕНИЯ
 // ======================================================
 
 function splitIntoSentences(text) {
+
     return text
         .replace(/\n+/g, " ")
         .split(/(?<=[.!?;])\s+/)
-        .map(sentence => sentence.trim())
-        .filter(sentence => sentence.length >= 15);
+        .map(sentence =>
+            sentence.trim()
+        )
+        .filter(
+            sentence =>
+                sentence.length >= 15
+        );
 }
 
 // ======================================================
-// ДЕНЕЖНЫЕ СУММЫ
+// ДЕНЬГИ
 // ======================================================
 
 function extractMoney(text) {
-    const matches = text.match(
-        /\b\d{1,3}(?:[\s\u00A0]\d{3})*(?:[.,]\d{1,2})?\s*(?:₽|руб\.?|рублей|р\.)\b/gi
-    );
+
+    const matches =
+        text.match(
+            /\b\d{1,3}(?:[\s\u00A0]\d{3})*(?:[.,]\d{1,2})?\s*(?:₽|руб\.?|рублей|р\.)\b/gi
+        );
 
     if (!matches) {
         return [];
     }
 
-    return [...new Set(
-        matches.map(item => item.trim())
-    )];
+    return [
+        ...new Set(
+            matches.map(
+                item => item.trim()
+            )
+        )
+    ];
 }
 
 // ======================================================
@@ -929,17 +1072,23 @@ function extractMoney(text) {
 // ======================================================
 
 function extractPercentages(text) {
-    const matches = text.match(
-        /\b\d+(?:[.,]\d+)?\s*%/gi
-    );
+
+    const matches =
+        text.match(
+            /\b\d+(?:[.,]\d+)?\s*%/gi
+        );
 
     if (!matches) {
         return [];
     }
 
-    return [...new Set(
-        matches.map(item => item.trim())
-    )];
+    return [
+        ...new Set(
+            matches.map(
+                item => item.trim()
+            )
+        )
+    ];
 }
 
 // ======================================================
@@ -947,15 +1096,20 @@ function extractPercentages(text) {
 // ======================================================
 
 function detectDuration(text) {
+
     const patterns = [
+
         /\b\d+\s*(?:месяц|месяцев|месяца)\b/gi,
+
         /\b\d+\s*(?:год|года|лет)\b/gi,
+
         /\b\d+\s*(?:день|дня|дней)\b/gi
     ];
 
     const found = [];
 
     for (const pattern of patterns) {
+
         const matches =
             text.match(pattern);
 
@@ -964,7 +1118,9 @@ function detectDuration(text) {
         }
     }
 
-    return [...new Set(found)];
+    return [
+        ...new Set(found)
+    ];
 }
 
 // ======================================================
@@ -973,48 +1129,32 @@ function detectDuration(text) {
 
 function createSummary(
     important,
-    worthKnowing,
-    clear
+    worthKnowing
 ) {
+
     if (
         important.length === 0 &&
         worthKnowing.length === 0
     ) {
-        return "Явных рискованных условий по текущим правилам не обнаружено.";
+
+        return "Явных условий, требующих внимания, по текущим правилам не обнаружено.";
     }
 
+    const total =
+        important.length +
+        worthKnowing.length;
+
     if (important.length >= 3) {
-        return "В документе обнаружено несколько условий, на которые стоит обратить особое внимание перед подписанием.";
+
+        return `Обнаружено ${total} условий, которые стоит проверить перед подписанием.`;
     }
 
     if (important.length > 0) {
-        return "В документе есть условия, которые стоит внимательно проверить перед подписанием.";
+
+        return `Обнаружено ${total} условий, которые стоит внимательно проверить.`;
     }
 
-    return "Документ содержит несколько условий, которые полезно учитывать.";
-}
-
-// ======================================================
-// УДАЛЕНИЕ ДУБЛИКАТОВ
-// ======================================================
-
-function removeDuplicates(items) {
-    const result = [];
-    const seen = new Set();
-
-    for (const item of items) {
-        const key =
-            `${item.title}|${item.source}`;
-
-        if (seen.has(key)) {
-            continue;
-        }
-
-        seen.add(key);
-        result.push(item);
-    }
-
-    return result;
+    return `Обнаружено ${total} условий, которые полезно учитывать.`;
 }
 
 // ======================================================
@@ -1022,258 +1162,746 @@ function removeDuplicates(items) {
 // ======================================================
 
 function renderAnalysisResult(result) {
+
     clearPreviousResult();
+
+    document.body.classList.add(
+        "has-analysis"
+    );
 
     const container =
         document.createElement("section");
 
-    container.className = "analysis-result";
+    container.className =
+        "analysis-result";
+
+    const categoryCards =
+        renderCategoryCards(result);
 
     container.innerHTML = `
+
         <div class="result-header">
+
             <div class="result-label">
-                Результат анализа
+                ПАСПОРТ ДОКУМЕНТА
             </div>
 
             <h2>
-                Что найдено в документе
+                Что нашли
             </h2>
 
             <p class="result-summary">
                 ${escapeHtml(result.summary)}
             </p>
+
         </div>
 
-        ${renderDuration(result)}
 
-        ${renderImportant(result.important)}
+        <div class="result-overview">
 
-        ${renderWorthKnowing(result.worthKnowing)}
+            <div class="overview-main">
 
-        ${renderMoney(result)}
+                <span class="overview-number">
+                    ${result.totalFindings}
+                </span>
 
-        ${renderClear(result.clear)}
+                <div>
+                    <strong>
+                        условий требуют внимания
+                    </strong>
+
+                    <span>
+                        Нажмите на категорию, чтобы посмотреть детали
+                    </span>
+                </div>
+
+            </div>
+
+            <div class="overview-status">
+                АНАЛИЗ ГОТОВ
+            </div>
+
+        </div>
+
+
+        ${renderDurationCard(result)}
+
+        <div class="result-categories">
+
+            ${categoryCards}
+
+        </div>
+
 
         <div class="result-disclaimer">
-            Анализ выполняется автоматически и носит
-            справочный характер. Он не является юридической
-            консультацией и не заменяет проверку документа
-            специалистом.
+
+            <span>Справочная информация</span>
+
+            Анализ выполняется автоматически.
+            Он помогает обратить внимание на условия
+            документа и не является юридической консультацией.
+
         </div>
     `;
 
     if (uploadCard) {
+
         uploadCard.insertAdjacentElement(
             "afterend",
             container
         );
+
     } else {
-        document.body.appendChild(container);
+
+        document.body.appendChild(
+            container
+        );
     }
 
-    setTimeout(() => {
-        container.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
-    }, 100);
+    requestAnimationFrame(() => {
+
+        setTimeout(() => {
+
+            container.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+            });
+
+        }, 150);
+    });
+
+    initResultInteractions();
 }
 
 // ======================================================
-// ВАЖНОЕ
+// КАТЕГОРИИ
 // ======================================================
 
-function renderImportant(items) {
-    if (!items.length) {
-        return "";
+function renderCategoryCards(result) {
+
+    const cards = [];
+
+    // --------------------------------------------------
+    // ВАЖНО
+    // --------------------------------------------------
+
+    if (result.important.length) {
+
+        cards.push(
+            createCategoryCard(
+                "important",
+                "!",
+                "Важно",
+                `${result.important.length} ${
+                    pluralize(
+                        result.important.length,
+                        "условие",
+                        "условия",
+                        "условий"
+                    )
+                }`,
+                "Условия, которые могут повлиять на деньги, обязанности или ваши права."
+            )
+        );
     }
 
-    return `
-        <div class="result-section result-important">
-            <div class="result-section-title">
-                <span>🔴</span>
-                Важно
-            </div>
+    // --------------------------------------------------
+    // ДЕНЬГИ
+    // --------------------------------------------------
 
-            ${items.map(renderFinding).join("")}
-        </div>
-    `;
-}
-
-// ======================================================
-// СТОИТ ЗНАТЬ
-// ======================================================
-
-function renderWorthKnowing(items) {
-    if (!items.length) {
-        return "";
-    }
-
-    return `
-        <div class="result-section result-worth-knowing">
-            <div class="result-section-title">
-                <span>🟡</span>
-                Стоит знать
-            </div>
-
-            ${items.map(renderFinding).join("")}
-        </div>
-    `;
-}
-
-// ======================================================
-// ПОНЯТНО
-// ======================================================
-
-function renderClear(items) {
-    if (!items.length) {
-        return "";
-    }
-
-    return `
-        <div class="result-section result-clear">
-            <div class="result-section-title">
-                <span>🟢</span>
-                Обнаружено
-            </div>
-
-            ${items.map(renderFinding).join("")}
-        </div>
-    `;
-}
-
-// ======================================================
-// ДЕНЬГИ
-// ======================================================
-
-function renderMoney(result) {
     if (
-        (!result.payments || result.payments.length === 0) &&
-        (!result.percentages || result.percentages.length === 0)
+        result.payments.length ||
+        result.percentages.length
     ) {
-        return "";
+
+        const count =
+            result.payments.length +
+            result.percentages.length;
+
+        cards.push(
+            createCategoryCard(
+                "money",
+                "₽",
+                "Деньги",
+                `${count} ${
+                    pluralize(
+                        count,
+                        "значение",
+                        "значения",
+                        "значений"
+                    )
+                }`,
+                "Суммы, проценты и финансовые условия документа."
+            )
+        );
     }
 
-    return `
-        <div class="result-section result-money">
-            <div class="result-section-title">
-                <span>₽</span>
-                Деньги
-            </div>
+    // --------------------------------------------------
+    // СТОИТ ЗНАТЬ
+    // --------------------------------------------------
 
-            ${
-                result.payments?.length
-                    ? `
-                        <div class="result-money-block">
-                            <strong>Найденные суммы</strong>
-                            <div class="money-list">
-                                ${result.payments
-                                    .map(item =>
-                                        `<span>${escapeHtml(item)}</span>`
-                                    )
-                                    .join("")}
-                            </div>
-                        </div>
-                    `
-                    : ""
-            }
+    if (result.worthKnowing.length) {
 
-            ${
-                result.percentages?.length
-                    ? `
-                        <div class="result-money-block">
-                            <strong>Проценты</strong>
-                            <div class="money-list">
-                                ${result.percentages
-                                    .map(item =>
-                                        `<span>${escapeHtml(item)}</span>`
-                                    )
-                                    .join("")}
-                            </div>
-                        </div>
-                    `
-                    : ""
-            }
-        </div>
-    `;
+        cards.push(
+            createCategoryCard(
+                "info",
+                "i",
+                "Стоит знать",
+                `${result.worthKnowing.length} ${
+                    pluralize(
+                        result.worthKnowing.length,
+                        "условие",
+                        "условия",
+                        "условий"
+                    )
+                }`,
+                "Сроки, расторжение, ограничения и другие условия."
+            )
+        );
+    }
+
+    // --------------------------------------------------
+    // СРОКИ
+    // --------------------------------------------------
+
+    if (result.duration.length) {
+
+        cards.push(
+            createCategoryCard(
+                "duration",
+                "◷",
+                "Сроки",
+                `${result.duration.length} ${
+                    pluralize(
+                        result.duration.length,
+                        "значение",
+                        "значения",
+                        "значений"
+                    )
+                }`,
+                "Обнаруженные сроки и продолжительность."
+            )
+        );
+    }
+
+    return cards.join("");
 }
 
 // ======================================================
-// СРОК
+// КАРТОЧКА КАТЕГОРИИ
 // ======================================================
 
-function renderDuration(result) {
-    if (!result.duration?.length) {
-        return "";
-    }
+function createCategoryCard(
+    type,
+    icon,
+    title,
+    count,
+    description
+) {
 
     return `
-        <div class="result-duration">
-            <span class="result-duration-label">
-                Сроки
+
+        <button
+            class="category-card category-${type}"
+            type="button"
+            data-category="${type}"
+            aria-expanded="false"
+        >
+
+            <span class="category-icon">
+                ${icon}
             </span>
 
-            <div class="duration-values">
-                ${result.duration
-                    .map(item =>
-                        `<span>${escapeHtml(item)}</span>`
-                    )
-                    .join("")}
+            <span class="category-content">
+
+                <strong>
+                    ${title}
+                </strong>
+
+                <span>
+                    ${count}
+                </span>
+
+            </span>
+
+            <span class="category-arrow">
+                →
+            </span>
+
+        </button>
+
+
+        <div
+            class="category-panel"
+            data-panel="${type}"
+            hidden
+        >
+
+            <div class="category-panel-inner">
+
+                <div class="category-panel-description">
+                    ${description}
+                </div>
+
+                <div class="category-panel-content"></div>
+
             </div>
+
         </div>
     `;
 }
 
 // ======================================================
-// КАРТОЧКА НАЙДЕННОГО ПУНКТА
+// СРОКИ
 // ======================================================
 
-function renderFinding(item) {
-    return `
-        <article class="finding-card">
-            <h3>
-                ${escapeHtml(item.title)}
-            </h3>
+function renderDurationCard(result) {
 
-            <p>
+    if (!result.duration.length) {
+        return "";
+    }
+
+    return `
+
+        <div class="compact-duration">
+
+            <div class="compact-duration-icon">
+                ◷
+            </div>
+
+            <div class="compact-duration-content">
+
+                <span>
+                    Сроки документа
+                </span>
+
+                <strong>
+                    ${result.duration
+                        .map(item =>
+                            escapeHtml(item)
+                        )
+                        .join(" · ")
+                    }
+                </strong>
+
+            </div>
+
+        </div>
+    `;
+}
+
+// ======================================================
+// ВЗАИМОДЕЙСТВИЯ
+// ======================================================
+
+function initResultInteractions() {
+
+    const buttons =
+        document.querySelectorAll(
+            ".category-card"
+        );
+
+    buttons.forEach(button => {
+
+        button.addEventListener(
+            "click",
+            () => {
+
+                const category =
+                    button.dataset.category;
+
+                const panel =
+                    document.querySelector(
+                        `[data-panel="${category}"]`
+                    );
+
+                if (!panel) {
+                    return;
+                }
+
+                const isOpen =
+                    button.getAttribute(
+                        "aria-expanded"
+                    ) === "true";
+
+                // Закрываем остальные
+
+                document
+                    .querySelectorAll(
+                        ".category-card[aria-expanded='true']"
+                    )
+                    .forEach(openButton => {
+
+                        if (
+                            openButton !== button
+                        ) {
+
+                            openButton.setAttribute(
+                                "aria-expanded",
+                                "false"
+                            );
+
+                            const otherCategory =
+                                openButton.dataset.category;
+
+                            const otherPanel =
+                                document.querySelector(
+                                    `[data-panel="${otherCategory}"]`
+                                );
+
+                            if (otherPanel) {
+                                otherPanel.hidden =
+                                    true;
+                            }
+                        }
+                    });
+
+                if (isOpen) {
+
+                    button.setAttribute(
+                        "aria-expanded",
+                        "false"
+                    );
+
+                    panel.hidden = true;
+
+                    return;
+                }
+
+                fillCategoryPanel(
+                    category,
+                    panel
+                );
+
+                button.setAttribute(
+                    "aria-expanded",
+                    "true"
+                );
+
+                panel.hidden = false;
+            }
+        );
+    });
+}
+
+// ======================================================
+// НАПОЛНЕНИЕ ОКНА КАТЕГОРИИ
+// ======================================================
+
+function fillCategoryPanel(
+    category,
+    panel
+) {
+
+    const content =
+        panel.querySelector(
+            ".category-panel-content"
+        );
+
+    if (!content) {
+        return;
+    }
+
+    const result =
+        document.querySelector(
+            ".analysis-result"
+        );
+
+    if (!result) {
+        return;
+    }
+
+    // --------------------------------------------------
+    // Получаем результат из DOM-данных
+    // --------------------------------------------------
+
+    const analysis =
+        window.__documentAnalysis;
+
+    if (!analysis) {
+        return;
+    }
+
+    // --------------------------------------------------
+    // ВАЖНО
+    // --------------------------------------------------
+
+    if (category === "important") {
+
+        content.innerHTML =
+            analysis.important
+                .map(
+                    renderGroupedFinding
+                )
+                .join("");
+
+        return;
+    }
+
+    // --------------------------------------------------
+    // СТОИТ ЗНАТЬ
+    // --------------------------------------------------
+
+    if (category === "info") {
+
+        content.innerHTML =
+            analysis.worthKnowing
+                .map(
+                    renderGroupedFinding
+                )
+                .join("");
+
+        return;
+    }
+
+    // --------------------------------------------------
+    // ДЕНЬГИ
+    // --------------------------------------------------
+
+    if (category === "money") {
+
+        content.innerHTML =
+            renderMoneyPanel(
+                analysis
+            );
+
+        return;
+    }
+
+    // --------------------------------------------------
+    // СРОКИ
+    // --------------------------------------------------
+
+    if (category === "duration") {
+
+        content.innerHTML =
+            renderDurationPanel(
+                analysis
+            );
+
+        return;
+    }
+}
+
+// ======================================================
+// НАХОДКА ВНУТРИ КАТЕГОРИИ
+// ======================================================
+
+function renderGroupedFinding(item) {
+
+    return `
+
+        <article class="detail-card">
+
+            <div class="detail-card-top">
+
+                <span class="detail-dot"></span>
+
+                <h3>
+                    ${escapeHtml(item.title)}
+                </h3>
+
+            </div>
+
+            <p class="detail-description">
                 ${escapeHtml(item.description)}
             </p>
 
+
             ${
-                item.source
+                item.sources?.length
                     ? `
-                        <div class="finding-source">
-                            <span>
-                                Фрагмент документа
+                        <div class="detail-sources">
+
+                            <span class="detail-source-label">
+                                Что сказано в документе
                             </span>
 
-                            <blockquote>
-                                «${escapeHtml(item.source)}»
-                            </blockquote>
+                            ${item.sources
+                                .slice(0, 5)
+                                .map(
+                                    source => `
+                                        <blockquote>
+                                            «${escapeHtml(source)}»
+                                        </blockquote>
+                                    `
+                                )
+                                .join("")
+                            }
+
                         </div>
                     `
                     : ""
             }
+
         </article>
     `;
 }
+
+// ======================================================
+// ДЕНЬГИ ВНУТРИ КАТЕГОРИИ
+// ======================================================
+
+function renderMoneyPanel(result) {
+
+    let html = "";
+
+    if (result.payments.length) {
+
+        html += `
+
+            <div class="money-detail-block">
+
+                <span class="detail-source-label">
+                    Суммы
+                </span>
+
+                <div class="money-values">
+
+                    ${result.payments
+                        .map(
+                            item => `
+                                <span class="money-value">
+                                    ${escapeHtml(item)}
+                                </span>
+                            `
+                        )
+                        .join("")
+                    }
+
+                </div>
+
+            </div>
+        `;
+    }
+
+    if (result.percentages.length) {
+
+        html += `
+
+            <div class="money-detail-block">
+
+                <span class="detail-source-label">
+                    Проценты
+                </span>
+
+                <div class="money-values">
+
+                    ${result.percentages
+                        .map(
+                            item => `
+                                <span class="percent-value">
+                                    ${escapeHtml(item)}
+                                </span>
+                            `
+                        )
+                        .join("")
+                    }
+
+                </div>
+
+            </div>
+        `;
+    }
+
+    return html;
+}
+
+// ======================================================
+// СРОКИ
+// ======================================================
+
+function renderDurationPanel(result) {
+
+    return `
+
+        <div class="duration-detail">
+
+            <span class="detail-source-label">
+                Обнаруженные значения
+            </span>
+
+            <div class="duration-values-large">
+
+                ${result.duration
+                    .map(
+                        item => `
+                            <span>
+                                ${escapeHtml(item)}
+                            </span>
+                        `
+                    )
+                    .join("")
+                }
+
+            </div>
+
+        </div>
+    `;
+}
+
+// ======================================================
+// СОХРАНЯЕМ РЕЗУЛЬТАТ
+// ======================================================
+
+function saveAnalysisResult(result) {
+
+    window.__documentAnalysis =
+        result;
+}
+
+// ======================================================
+// РЕНДЕР — ПЕРЕОПРЕДЕЛЯЕМ ФУНКЦИЮ
+// ======================================================
+
+const originalRenderAnalysisResult =
+    renderAnalysisResult;
+
+// ======================================================
+// ВАЖНО:
+// сохраняем результат перед отображением
+// ======================================================
+
+function renderAnalysisResultWithData(result) {
+
+    saveAnalysisResult(result);
+
+    originalRenderAnalysisResult(result);
+}
+
+// ======================================================
+// ПОДМЕНА ВЫЗОВА
+// ======================================================
+
+const oldHandleFile =
+    handleFile;
 
 // ======================================================
 // ВЫБРАННЫЙ ФАЙЛ
 // ======================================================
 
 function showSelectedFile(file) {
+
     if (!uploadCard) {
         return;
     }
 
     uploadCard.innerHTML = `
+
         <div class="selected-file">
+
             <div class="selected-file-icon">
-                ${getFileType(file) === "pdf" ? "PDF" : "IMG"}
+
+                ${
+                    getFileType(file) === "pdf"
+                        ? "PDF"
+                        : "IMG"
+                }
+
             </div>
 
             <div class="selected-file-info">
+
                 <strong>
                     ${escapeHtml(file.name)}
                 </strong>
@@ -1281,8 +1909,11 @@ function showSelectedFile(file) {
                 <span>
                     ${formatFileSize(file.size)}
                 </span>
+
             </div>
+
         </div>
+
 
         <div
             class="import-status status-loading"
@@ -1290,6 +1921,7 @@ function showSelectedFile(file) {
         >
             Подготавливаем документ...
         </div>
+
 
         <button
             class="upload-button secondary-upload-button"
@@ -1301,14 +1933,20 @@ function showSelectedFile(file) {
     `;
 
     const changeFileButton =
-        document.getElementById("changeFileButton");
+        document.getElementById(
+            "changeFileButton"
+        );
 
     if (changeFileButton) {
+
         changeFileButton.addEventListener(
             "click",
             () => {
+
                 if (fileInput) {
+
                     fileInput.value = "";
+
                     fileInput.click();
                 }
             }
@@ -1320,31 +1958,48 @@ function showSelectedFile(file) {
 // СТАТУС
 // ======================================================
 
-function showStatus(message, type) {
+function showStatus(
+    message,
+    type
+) {
+
     const status =
-        document.getElementById("importStatus");
+        document.getElementById(
+            "importStatus"
+        );
 
     if (!status) {
         return;
     }
 
-    status.textContent = message;
+    status.textContent =
+        message;
 
     status.className =
         `import-status status-${type}`;
 }
 
 // ======================================================
-// ОЧИСТКА ПРЕДЫДУЩЕГО РЕЗУЛЬТАТА
+// ОЧИСТКА
 // ======================================================
 
 function clearPreviousResult() {
+
     const oldResult =
-        document.querySelector(".analysis-result");
+        document.querySelector(
+            ".analysis-result"
+        );
 
     if (oldResult) {
         oldResult.remove();
     }
+
+    window.__documentAnalysis =
+        null;
+
+    document.body.classList.remove(
+        "has-analysis"
+    );
 }
 
 // ======================================================
@@ -1352,6 +2007,7 @@ function clearPreviousResult() {
 // ======================================================
 
 function formatFileSize(bytes) {
+
     if (bytes < 1024) {
         return `${bytes} Б`;
     }
@@ -1360,7 +2016,48 @@ function formatFileSize(bytes) {
         return `${Math.round(bytes / 1024)} КБ`;
     }
 
-    return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+    return `${(
+        bytes /
+        (1024 * 1024)
+    ).toFixed(1)} МБ`;
+}
+
+// ======================================================
+// PLURAL
+// ======================================================
+
+function pluralize(
+    number,
+    one,
+    few,
+    many
+) {
+
+    const n =
+        Math.abs(number) % 100;
+
+    const n1 =
+        n % 10;
+
+    if (
+        n >= 11 &&
+        n <= 19
+    ) {
+        return many;
+    }
+
+    if (n1 === 1) {
+        return one;
+    }
+
+    if (
+        n1 >= 2 &&
+        n1 <= 4
+    ) {
+        return few;
+    }
+
+    return many;
 }
 
 // ======================================================
@@ -1368,12 +2065,28 @@ function formatFileSize(bytes) {
 // ======================================================
 
 function escapeHtml(value) {
+
     return String(value)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+        .replace(
+            /&/g,
+            "&amp;"
+        )
+        .replace(
+            /</g,
+            "&lt;"
+        )
+        .replace(
+            />/g,
+            "&gt;"
+        )
+        .replace(
+            /"/g,
+            "&quot;"
+        )
+        .replace(
+            /'/g,
+            "&#039;"
+        );
 }
 
 // ======================================================
@@ -1381,7 +2094,68 @@ function escapeHtml(value) {
 // ======================================================
 
 function sleep(ms) {
-    return new Promise(resolve =>
-        setTimeout(resolve, ms)
+
+    return new Promise(
+        resolve =>
+            setTimeout(
+                resolve,
+                ms
+            )
     );
 }
+
+// ======================================================
+// ВАЖНЫЙ FIX:
+// сохраняем данные анализа
+// ======================================================
+
+const originalAnalyzeDocument =
+    analyzeDocument;
+
+function analyzeDocumentAndStore(text) {
+
+    const result =
+        originalAnalyzeDocument(text);
+
+    saveAnalysisResult(result);
+
+    return result;
+}
+
+// ======================================================
+// ПЕРЕОПРЕДЕЛЯЕМ ГЛАВНЫЙ АНАЛИЗ
+// ======================================================
+
+const originalHandleFileFunction =
+    handleFile;
+
+// ------------------------------------------------------
+// Исправляем renderAnalysisResult напрямую через
+// сохранение результата в существующей функции.
+// ------------------------------------------------------
+
+const renderAnalysisResultOriginal =
+    window.renderAnalysisResult;
+
+// ======================================================
+// ПЕРЕХВАТ РЕЗУЛЬТАТА
+// ======================================================
+
+// Так как функции находятся в одном файле,
+// переиспользуем сохранение через Mutation-safe подход.
+// ======================================================
+
+// Обёртка для текущего результата
+const _renderAnalysisResult =
+    renderAnalysisResult;
+
+// ======================================================
+// ПЕРЕОПРЕДЕЛЕНИЕ
+// ======================================================
+
+renderAnalysisResult = function(result) {
+
+    saveAnalysisResult(result);
+
+    _renderAnalysisResult(result);
+};
